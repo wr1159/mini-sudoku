@@ -1,0 +1,24 @@
+{
+  "name": "Mini Sudoku 6×6",
+  "short_name": "Mini Sudoku",
+  "description": "Play 6×6 Mini Sudoku with smart hints and LinkedIn theme",
+  "start_url": "./linkedin-sudoku.html",
+  "display": "standalone",
+  "background_color": "#f3f2ef",
+  "theme_color": "#0a66c2",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%230a66c2' rx='24'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='100' fill='white' font-family='Arial, sans-serif' font-weight='700'>6×6</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%230a66c2' rx='64'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='280' fill='white' font-family='Arial, sans-serif' font-weight='700'>6×6</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

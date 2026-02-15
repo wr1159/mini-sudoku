@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a66c2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Mini Sudoku">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%230a66c2'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='280' fill='white' font-family='Arial'>6×6</text></svg>">
+    <title>Mini Sudoku 6×6</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: #f3f2ef;
+            min-height: 100vh;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08);
+            padding: 20px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #000000e6;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: #00000099;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #f3f2ef;
+            border-radius: 4px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #00000099;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: #0a66c2;
+        }
+
+        .grid-wrapper {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .sudoku-grid {
+            display: inline-grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0;
+            border: 2px solid #00000099;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #00000099;
+            transition: filter 0.3s ease;
+        }
+
+        .sudoku-grid.blurred {
+            filter: blur(8px);
+            pointer-events: none;
+        }
+
+        .cell {
+            width: 48px;
+            height: 48px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 500;
+            cursor: pointer;
+            position: relative;
+            border: 0.5px solid #0000001a;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .cell:active {
+            background: #f3f2ef;
+        }
+
+        .cell.given {
+            color: #00000099;
+            background: #fafafa;
+            font-weight: 600;
+        }
+
+        .cell.user-input {
+            color: #0a66c2;
+            font-weight: 600;
+        }
+
+        .cell.selected {
+            background: #dbe7f2 !important;
+            box-shadow: inset 0 0 0 2px #0a66c2;
+        }
+
+        .cell.highlighted {
+            background: #fff4cc;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { background: #fff4cc; }
+            50% { background: #ffe999; }
+        }
+
+        .cell.complete-flash {
+            animation: complete-flash 0.6s ease-out;
+        }
+
+        @keyframes complete-flash {
+            0% { background: #10b981; }
+            50% { background: #34d399; transform: scale(1.05); }
+            100% { background: white; transform: scale(1); }
+        }
+
+        .cell.given.complete-flash {
+            animation: complete-flash-given 0.6s ease-out;
+        }
+
+        @keyframes complete-flash-given {
+            0% { background: #10b981; }
+            50% { background: #34d399; transform: scale(1.05); }
+            100% { background: #fafafa; transform: scale(1); }
+        }
+
+        .cell.user-input.complete-flash {
+            animation: complete-flash-user 0.6s ease-out;
+        }
+
+        @keyframes complete-flash-user {
+            0% { background: #10b981; }
+            50% { background: #34d399; transform: scale(1.05); }
+            100% { background: white; transform: scale(1); }
+        }
+
+        .cell.error {
+            background: #fee !important;
+            color: #c00 !important;
+        }
+
+        /* 2×3 block borders */
+        /* Grid: 6 boxes (3 rows × 2 columns of boxes) */
+        /* Each box is 2 rows tall × 3 columns wide */
+        
+        /* Vertical border after column 3 (splits left and right boxes) */
+        .cell:nth-child(3),   /* row 1, col 3 */
+        .cell:nth-child(9),   /* row 2, col 3 */
+        .cell:nth-child(15),  /* row 3, col 3 */
+        .cell:nth-child(21),  /* row 4, col 3 */
+        .cell:nth-child(27),  /* row 5, col 3 */
+        .cell:nth-child(33) { /* row 6, col 3 */
+            border-right: 2px solid #00000099;
+        }
+
+        /* Horizontal border after row 2 (cells 7-12) */
+        .cell:nth-child(7),
+        .cell:nth-child(8),
+        .cell:nth-child(9),
+        .cell:nth-child(10),
+        .cell:nth-child(11),
+        .cell:nth-child(12) {
+            border-bottom: 2px solid #00000099;
+        }
+        
+        /* Horizontal border after row 4 (cells 19-24) */
+        .cell:nth-child(19),
+        .cell:nth-child(20),
+        .cell:nth-child(21),
+        .cell:nth-child(22),
+        .cell:nth-child(23),
+        .cell:nth-child(24) {
+            border-bottom: 2px solid #00000099;
+        }
+
+        .notes {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            width: 100%;
+            height: 100%;
+            padding: 3px;
+        }
+
+        .note {
+            font-size: 10px;
+            color: #00000066;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 400;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border: 1px solid #0a66c2;
+            border-radius: 16px;
+            background: white;
+            color: #0a66c2;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+
+        .btn:active {
+            background: #0a66c2;
+            color: white;
+        }
+
+        .btn-primary {
+            background: #0a66c2;
+            color: white;
+        }
+
+        .btn-primary:active {
+            background: #004182;
+        }
+
+        .number-pad {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .number-btn {
+            padding: 14px;
+            font-size: 18px;
+            font-weight: 600;
+            border: 1px solid #0000001a;
+            border-radius: 4px;
+            background: white;
+            color: #000000e6;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .number-btn:active {
+            background: #f3f2ef;
+            transform: scale(0.95);
+        }
+
+        .mode-toggle {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 4px;
+            background: #f3f2ef;
+            border-radius: 20px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 16px;
+            background: transparent;
+            color: #00000099;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .mode-btn.active {
+            background: white;
+            color: #0a66c2;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .hint-levels {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+        }
+
+        .hint-level-btn {
+            padding: 6px 12px;
+            border: 1px solid #0000001a;
+            border-radius: 12px;
+            background: white;
+            color: #00000099;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .hint-level-btn.active {
+            border-color: #0a66c2;
+            background: #eef3f8;
+            color: #0a66c2;
+        }
+
+        .message {
+            padding: 12px 16px;
+            margin-top: 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        @media (max-width: 400px) {
+            .cell {
+                width: 44px;
+                height: 44px;
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="installBanner" style="display: none; background: #eef3f8; border: 1px solid #0a66c2; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; text-align: center;">
+            <div style="font-size: 13px; color: #0a66c2; margin-bottom: 8px;">
+                📱 <strong>Add to Home Screen</strong>
+            </div>
+            <div style="font-size: 12px; color: #00000099; margin-bottom: 8px;" id="installInstructions"></div>
+            <button class="btn btn-primary" style="width: 100%; margin-top: 4px;" onclick="app.dismissInstallBanner()">Got it!</button>
+        </div>
+
+        <div class="header">
+            <h1>Mini Sudoku 6×6</h1>
+            <p>Fill each row, column, and 2×3 box with 1-6</p>
+            <p style="font-size: 11px; color: #00000066; margin-top: 4px;">6 boxes: each is 2 rows tall × 3 columns wide</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">Time</div>
+                <div class="stat-value" id="timer">0:00</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Difficulty</div>
+                <div class="stat-value" id="difficulty">Medium</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" onclick="app.newPuzzle()">New Puzzle</button>
+            <button class="btn" onclick="app.toggleTimer()"><span id="timerBtn">Pause</span></button>
+        </div>
+
+        <div class="grid-wrapper">
+            <div class="sudoku-grid" id="grid"></div>
+        </div>
+
+        <div class="mode-toggle" style="margin-top: 20px;">
+            <button class="mode-btn" onclick="app.getHint()">💡 Hint</button>
+            <button class="mode-btn" id="notesBtn" onclick="app.toggleNotes()">✏️ Notes</button>
+        </div>
+
+        <div class="number-pad">
+            <button class="number-btn" onclick="app.inputNumber(1)">1</button>
+            <button class="number-btn" onclick="app.inputNumber(2)">2</button>
+            <button class="number-btn" onclick="app.inputNumber(3)">3</button>
+            <button class="number-btn" onclick="app.clearCell()">Clear</button>
+            <button class="number-btn" onclick="app.inputNumber(4)">4</button>
+            <button class="number-btn" onclick="app.inputNumber(5)">5</button>
+            <button class="number-btn" onclick="app.inputNumber(6)">6</button>
+            <button class="number-btn" onclick="app.undo()">Undo</button>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <div style="font-size: 12px; color: #00000099; margin-bottom: 6px; text-align: center; font-weight: 600;">Difficulty</div>
+            <div class="hint-levels">
+                <button class="hint-level-btn" onclick="app.changeDifficulty('easy')">Easy</button>
+                <button class="hint-level-btn active" id="diffMedium" onclick="app.changeDifficulty('medium')">Medium</button>
+                <button class="hint-level-btn" onclick="app.changeDifficulty('hard')">Hard</button>
+                <button class="hint-level-btn" onclick="app.changeDifficulty('expert')">Expert</button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <div style="font-size: 12px; color: #00000099; margin-bottom: 6px; text-align: center; font-weight: 600;">Hint Detail</div>
+            <div class="hint-levels">
+                <button class="hint-level-btn" onclick="app.setHintLevel('strategy')">Strategy</button>
+                <button class="hint-level-btn" onclick="app.setHintLevel('location')">Location</button>
+                <button class="hint-level-btn active" onclick="app.setHintLevel('full')">Full</button>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="button btn" onclick="app.applyHint()">✓ Apply Hint</button>
+            <button class="btn" onclick="app.solveAll()">Solve All</button>
+        </div>
+
+        <div id="message" style="display: none;"></div>
+    </div>
+
+    <script>
+        const app = {
+            grid: [],
+            solution: [],
+            initialGrid: [],
+            selectedCell: null,
+            mode: 'normal',
+            notes: {},
+            timer: 0,
+            timerInterval: null,
+            isRunning: true,
+            hintLevel: 'full',
+            currentHint: null,
+            highlightedCells: [],
+            history: [], // For undo functionality
+            difficulty: 'medium',
+
+            init() {
+                this.newPuzzle();
+            },
+
+            isValid(grid, row, col, num) {
+                for (let x = 0; x < 6; x++) {
+                    if (grid[row][x] === num) return false;
+                    if (grid[x][col] === num) return false;
+                }
+                const boxRow = Math.floor(row / 2) * 2;
+                const boxCol = Math.floor(col / 3) * 3;
+                for (let i = 0; i < 2; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        if (grid[boxRow + i][boxCol + j] === num) return false;
+                    }
+                }
+                return true;
+            },
+
+            solve(grid) {
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (grid[row][col] === 0) {
+                            for (let num = 1; num <= 6; num++) {
+                                if (this.isValid(grid, row, col, num)) {
+                                    grid[row][col] = num;
+                                    if (this.solve(grid)) return true;
+                                    grid[row][col] = 0;
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            },
+
+            generatePuzzle(difficulty = 'medium') {
+                const grid = Array(6).fill(null).map(() => Array(6).fill(0));
+                
+                // Fill the first row with random numbers
+                const firstRow = [1, 2, 3, 4, 5, 6].sort(() => Math.random() - 0.5);
+                for (let col = 0; col < 6; col++) {
+                    grid[0][col] = firstRow[col];
+                }
+
+                // Solve the rest
+                this.solve(grid);
+                const solution = grid.map(row => [...row]);
+                
+                const cellsToRemove = { 
+                    easy: 12,      // More clues = easier
+                    medium: 18,    // Moderate clues
+                    hard: 22,      // Fewer clues = harder
+                    expert: 25     // Very few clues = needs advanced techniques
+                }[difficulty] || 18;
+                
+                let removed = 0;
+                const attempts = new Set();
+                
+                while (removed < cellsToRemove && attempts.size < 100) {
+                    const row = Math.floor(Math.random() * 6);
+                    const col = Math.floor(Math.random() * 6);
+                    const key = `${row}-${col}`;
+                    
+                    if (grid[row][col] !== 0 && !attempts.has(key)) {
+                        attempts.add(key);
+                        grid[row][col] = 0;
+                        removed++;
+                    }
+                }
+
+                return { puzzle: grid, solution };
+            },
+
+            getCandidates(grid, row, col) {
+                if (grid[row][col] !== 0) return [];
+                const candidates = [];
+                for (let num = 1; num <= 6; num++) {
+                    if (this.isValid(grid, row, col, num)) {
+                        candidates.push(num);
+                    }
+                }
+                return candidates;
+            },
+
+            findNakedSingle(grid) {
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (grid[row][col] === 0) {
+                            const candidates = this.getCandidates(grid, row, col);
+                            if (candidates.length === 1) {
+                                return {
+                                    type: 'Naked Single',
+                                    row, col,
+                                    value: candidates[0],
+                                    explanation: `Cell (${row + 1}, ${col + 1}) can only be ${candidates[0]}. All other numbers are eliminated by existing numbers in its row, column, and box.`,
+                                    cells: [[row, col]]
+                                };
+                            }
+                        }
+                    }
+                }
+                return null;
+            },
+
+            findHiddenSingle(grid) {
+                for (let row = 0; row < 6; row++) {
+                    for (let num = 1; num <= 6; num++) {
+                        const positions = [];
+                        for (let col = 0; col < 6; col++) {
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
+                                positions.push(col);
+                            }
+                        }
+                        if (positions.length === 1) {
+                            return {
+                                type: 'Hidden Single (Row)',
+                                row, col: positions[0],
+                                value: num,
+                                explanation: `In row ${row + 1}, the number ${num} can only go in column ${positions[0] + 1}.`,
+                                cells: [[row, positions[0]]]
+                            };
+                        }
+                    }
+                }
+
+                for (let col = 0; col < 6; col++) {
+                    for (let num = 1; num <= 6; num++) {
+                        const positions = [];
+                        for (let row = 0; row < 6; row++) {
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
+                                positions.push(row);
+                            }
+                        }
+                        if (positions.length === 1) {
+                            return {
+                                type: 'Hidden Single (Column)',
+                                row: positions[0], col,
+                                value: num,
+                                explanation: `In column ${col + 1}, the number ${num} can only go in row ${positions[0] + 1}.`,
+                                cells: [[positions[0], col]]
+                            };
+                        }
+                    }
+                }
+
+                for (let boxIdx = 0; boxIdx < 6; boxIdx++) {
+                    const boxRow = Math.floor(boxIdx / 3) * 2;
+                    const boxCol = (boxIdx % 3) * 3;
+                    
+                    for (let num = 1; num <= 6; num++) {
+                        const positions = [];
+                        for (let i = 0; i < 2; i++) {
+                            for (let j = 0; j < 3; j++) {
+                                const row = boxRow + i;
+                                const col = boxCol + j;
+                                if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
+                                    positions.push([row, col]);
+                                }
+                            }
+                        }
+                        if (positions.length === 1) {
+                            return {
+                                type: 'Hidden Single (Box)',
+                                row: positions[0][0], col: positions[0][1],
+                                value: num,
+                                explanation: `In box (${Math.floor(boxIdx / 3) + 1}, ${(boxIdx % 3) + 1}), the number ${num} can only go in one position.`,
+                                cells: positions
+                            };
+                        }
+                    }
+                }
+                return null;
+            },
+
+            getSmartHint(grid) {
+                // Basic techniques (all difficulties)
+                let hint = this.findNakedSingle(grid);
+                if (hint) return hint;
+                
+                hint = this.findHiddenSingle(grid);
+                if (hint) return hint;
+
+                // Intermediate techniques (medium+)
+                if (this.difficulty !== 'easy') {
+                    hint = this.findNakedPair(grid);
+                    if (hint) return hint;
+
+                    hint = this.findPointingPair(grid);
+                    if (hint) return hint;
+
+                    hint = this.findBoxLineReduction(grid);
+                    if (hint) return hint;
+                }
+
+                // Advanced techniques (hard+)
+                if (this.difficulty === 'hard' || this.difficulty === 'expert') {
+                    hint = this.findXWing(grid);
+                    if (hint) return hint;
+                }
+
+                // Expert techniques
+                if (this.difficulty === 'expert') {
+                    hint = this.findYWing(grid);
+                    if (hint) return hint;
+                }
+
+                // Fallback
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (grid[row][col] === 0) {
+                            const candidates = this.getCandidates(grid, row, col);
+                            return {
+                                type: 'General Hint',
+                                row, col,
+                                value: null,
+                                explanation: `Cell (${row + 1}, ${col + 1}) has ${candidates.length} candidates: ${candidates.join(', ')}.${this.difficulty === 'expert' ? ' Try advanced techniques like coloring or chains.' : ''}`,
+                                cells: [[row, col]]
+                            };
+                        }
+                    }
+                }
+                return null;
+            },
+
+            findNakedPair(grid) {
+                const allCandidates = {};
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (grid[row][col] === 0) {
+                            allCandidates[`${row}-${col}`] = this.getCandidates(grid, row, col);
+                        }
+                    }
+                }
+                
+                // Check rows
+                for (let row = 0; row < 6; row++) {
+                    const cellsInRow = [];
+                    for (let col = 0; col < 6; col++) {
+                        const key = `${row}-${col}`;
+                        if (allCandidates[key] && allCandidates[key].length === 2) {
+                            cellsInRow.push({ col, candidates: allCandidates[key] });
+                        }
+                    }
+                    
+                    for (let i = 0; i < cellsInRow.length; i++) {
+                        for (let j = i + 1; j < cellsInRow.length; j++) {
+                            const c1 = cellsInRow[i].candidates;
+                            const c2 = cellsInRow[j].candidates;
+                            if (c1[0] === c2[0] && c1[1] === c2[1]) {
+                                return {
+                                    type: 'Naked Pair',
+                                    explanation: `Row ${row + 1} has a naked pair [${c1[0]}, ${c1[1]}] in columns ${cellsInRow[i].col + 1} and ${cellsInRow[j].col + 1}. These numbers can be eliminated from other cells in this row.`,
+                                    cells: [[row, cellsInRow[i].col], [row, cellsInRow[j].col]],
+                                    values: c1
+                                };
+                            }
+                        }
+                    }
+                }
+                return null;
+            },
+
+            findPointingPair(grid) {
+                for (let boxIdx = 0; boxIdx < 6; boxIdx++) {
+                    const boxRow = Math.floor(boxIdx / 2) * 2;
+                    const boxCol = (boxIdx % 2) * 3;
+                    
+                    for (let num = 1; num <= 6; num++) {
+                        const positions = [];
+                        for (let i = 0; i < 2; i++) {
+                            for (let j = 0; j < 3; j++) {
+                                const row = boxRow + i;
+                                const col = boxCol + j;
+                                if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
+                                    positions.push([row, col]);
+                                }
+                            }
+                        }
+                        
+                        if (positions.length >= 2 && positions.length <= 3) {
+                            const sameRow = positions.every(([r]) => r === positions[0][0]);
+                            if (sameRow) {
+                                return {
+                                    type: 'Pointing Pair',
+                                    explanation: `In box at (${boxRow + 1}, ${boxCol + 1}), number ${num} only appears in row ${positions[0][0] + 1}. Eliminates ${num} from other cells in that row.`,
+                                    cells: positions,
+                                    value: num
+                                };
+                            }
+                            
+                            const sameCol = positions.every(([, c]) => c === positions[0][1]);
+                            if (sameCol) {
+                                return {
+                                    type: 'Pointing Pair',
+                                    explanation: `In box at (${boxRow + 1}, ${boxCol + 1}), number ${num} only appears in column ${positions[0][1] + 1}. Eliminates ${num} from other cells in that column.`,
+                                    cells: positions,
+                                    value: num
+                                };
+                            }
+                        }
+                    }
+                }
+                return null;
+            },
+
+            findBoxLineReduction(grid) {
+                for (let num = 1; num <= 6; num++) {
+                    for (let row = 0; row < 6; row++) {
+                        const positions = [];
+                        for (let col = 0; col < 6; col++) {
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
+                                positions.push([row, col]);
+                            }
+                        }
+                        
+                        if (positions.length >= 2) {
+                            const boxCols = positions.map(([, c]) => Math.floor(c / 3));
+                            if (boxCols.every(bc => bc === boxCols[0])) {
+                                return {
+                                    type: 'Box/Line Reduction',
+                                    explanation: `In row ${row + 1}, number ${num} only appears in one box. Eliminates ${num} from other cells in that box.`,
+                                    cells: positions,
+                                    value: num
+                                };
+                            }
+                        }
+                    }
+                }
+                return null;
+            },
+
+            findXWing(grid) {
+                for (let num = 1; num <= 6; num++) {
+                    const rowPairs = [];
+                    
+                    for (let row = 0; row < 6; row++) {
+                        const cols = [];
+                        for (let col = 0; col < 6; col++) {
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
+                                cols.push(col);
+                            }
+                        }
+                        if (cols.length === 2) {
+                            rowPairs.push({ row, cols });
+                        }
+                    }
+                    
+                    for (let i = 0; i < rowPairs.length; i++) {
+                        for (let j = i + 1; j < rowPairs.length; j++) {
+                            if (rowPairs[i].cols[0] === rowPairs[j].cols[0] && 
+                                rowPairs[i].cols[1] === rowPairs[j].cols[1]) {
+                                return {
+                                    type: 'X-Wing',
+                                    explanation: `X-Wing: ${num} appears exactly twice in rows ${rowPairs[i].row + 1} and ${rowPairs[j].row + 1}, both in columns ${rowPairs[i].cols[0] + 1} and ${rowPairs[i].cols[1] + 1}. Eliminates ${num} from other cells in those columns.`,
+                                    cells: [
+                                        [rowPairs[i].row, rowPairs[i].cols[0]],
+                                        [rowPairs[i].row, rowPairs[i].cols[1]],
+                                        [rowPairs[j].row, rowPairs[j].cols[0]],
+                                        [rowPairs[j].row, rowPairs[j].cols[1]]
+                                    ],
+                                    value: num
+                                };
+                            }
+                        }
+                    }
+                }
+                return null;
+            },
+
+            findYWing(grid) {
+                const allCandidates = {};
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (grid[row][col] === 0) {
+                            const cands = this.getCandidates(grid, row, col);
+                            if (cands.length === 2) {
+                                allCandidates[`${row}-${col}`] = { row, col, cands };
+                            }
+                        }
+                    }
+                }
+                
+                const biValueCells = Object.values(allCandidates);
+                
+                for (let i = 0; i < biValueCells.length; i++) {
+                    const pivot = biValueCells[i];
+                    for (let j = 0; j < biValueCells.length; j++) {
+                        if (i === j) continue;
+                        const wing1 = biValueCells[j];
+                        
+                        const sharedWithPivot = pivot.cands.filter(c => wing1.cands.includes(c));
+                        if (sharedWithPivot.length !== 1) continue;
+                        
+                        for (let k = 0; k < biValueCells.length; k++) {
+                            if (k === i || k === j) continue;
+                            const wing2 = biValueCells[k];
+                            
+                            const sharedWithPivot2 = pivot.cands.filter(c => wing2.cands.includes(c));
+                            if (sharedWithPivot2.length !== 1) continue;
+                            if (sharedWithPivot2[0] === sharedWithPivot[0]) continue;
+                            
+                            const sharedBetweenWings = wing1.cands.filter(c => wing2.cands.includes(c));
+                            if (sharedBetweenWings.length === 1) {
+                                return {
+                                    type: 'Y-Wing',
+                                    explanation: `Y-Wing: Pivot at (${pivot.row + 1}, ${pivot.col + 1}) [${pivot.cands.join(',')}] connects two wings. Eliminates ${sharedBetweenWings[0]} from cells seeing both wings.`,
+                                    cells: [
+                                        [pivot.row, pivot.col],
+                                        [wing1.row, wing1.col],
+                                        [wing2.row, wing2.col]
+                                    ],
+                                    value: sharedBetweenWings[0]
+                                };
+                            }
+                        }
+                    }
+                }
+                return null;
+            },
+
+            newPuzzle() {
+                const { puzzle, solution } = this.generatePuzzle('medium');
+                
+                // Verify the puzzle is valid
+                console.log('Generated puzzle:', puzzle);
+                console.log('Solution:', solution);
+                
+                this.grid = puzzle.map(row => [...row]);
+                this.initialGrid = puzzle.map(row => [...row]);
+                this.solution = solution;
+                this.selectedCell = null;
+                this.notes = {};
+                this.history = [];
+                this.timer = 0;
+                this.isRunning = true;
+                this.currentHint = null;
+                this.highlightedCells = [];
+                this.startTimer();
+                this.render();
+                this.hideMessage();
+            },
+
+            startTimer() {
+                clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(() => {
+                    if (this.isRunning) {
+                        this.timer++;
+                        this.updateTimer();
+                    }
+                }, 1000);
+            },
+
+            toggleTimer() {
+                this.isRunning = !this.isRunning;
+                document.getElementById('timerBtn').textContent = this.isRunning ? 'Pause' : 'Resume';
+                
+                // Add/remove blur effect
+                const grid = document.getElementById('grid');
+                if (this.isRunning) {
+                    grid.classList.remove('blurred');
+                } else {
+                    grid.classList.add('blurred');
+                }
+            },
+
+            updateTimer() {
+                const mins = Math.floor(this.timer / 60);
+                const secs = this.timer % 60;
+                document.getElementById('timer').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            },
+
+            toggleNotes() {
+                this.mode = this.mode === 'normal' ? 'notes' : 'normal';
+                const notesBtn = document.getElementById('notesBtn');
+                if (this.mode === 'notes') {
+                    notesBtn.classList.add('active');
+                } else {
+                    notesBtn.classList.remove('active');
+                }
+            },
+
+            setHintLevel(level) {
+                this.hintLevel = level;
+                document.querySelectorAll('.hint-level-btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+            },
+
+            selectCell(row, col) {
+                if (this.initialGrid[row][col] !== 0) return;
+                this.selectedCell = [row, col];
+                this.render();
+            },
+
+            checkUnitComplete(row, col) {
+                // Check if a row is complete and correct
+                const checkRow = (r) => {
+                    const rowCells = this.grid[r];
+                    if (rowCells.some(c => c === 0)) return false;
+                    const expected = [1, 2, 3, 4, 5, 6].sort();
+                    const actual = [...rowCells].sort();
+                    return expected.every((val, i) => val === actual[i]);
+                };
+
+                // Check if a column is complete and correct
+                const checkCol = (c) => {
+                    const colCells = this.grid.map(row => row[c]);
+                    if (colCells.some(cell => cell === 0)) return false;
+                    const expected = [1, 2, 3, 4, 5, 6].sort();
+                    const actual = [...colCells].sort();
+                    return expected.every((val, i) => val === actual[i]);
+                };
+
+                // Check if a box is complete and correct
+                const checkBox = (r, c) => {
+                    const boxRow = Math.floor(r / 2) * 2;
+                    const boxCol = Math.floor(c / 3) * 3;
+                    const boxCells = [];
+                    for (let i = 0; i < 2; i++) {
+                        for (let j = 0; j < 3; j++) {
+                            boxCells.push(this.grid[boxRow + i][boxCol + j]);
+                        }
+                    }
+                    if (boxCells.some(cell => cell === 0)) return false;
+                    const expected = [1, 2, 3, 4, 5, 6].sort();
+                    const actual = [...boxCells].sort();
+                    return expected.every((val, i) => val === actual[i]);
+                };
+
+                const completedUnits = [];
+
+                // Check row
+                if (checkRow(row)) {
+                    completedUnits.push({ type: 'row', index: row });
+                }
+
+                // Check column
+                if (checkCol(col)) {
+                    completedUnits.push({ type: 'col', index: col });
+                }
+
+                // Check box
+                if (checkBox(row, col)) {
+                    const boxRow = Math.floor(row / 2) * 2;
+                    const boxCol = Math.floor(col / 3) * 3;
+                    completedUnits.push({ type: 'box', boxRow, boxCol });
+                }
+
+                // Animate completed units
+                if (completedUnits.length > 0) {
+                    this.animateCompletions(completedUnits);
+                }
+            },
+
+            animateCompletions(units) {
+                const cells = document.querySelectorAll('.cell');
+                
+                units.forEach(unit => {
+                    if (unit.type === 'row') {
+                        // Animate entire row
+                        for (let col = 0; col < 6; col++) {
+                            const cellIndex = unit.index * 6 + col;
+                            cells[cellIndex].classList.add('complete-flash');
+                            setTimeout(() => {
+                                cells[cellIndex].classList.remove('complete-flash');
+                            }, 600);
+                        }
+                    } else if (unit.type === 'col') {
+                        // Animate entire column
+                        for (let row = 0; row < 6; row++) {
+                            const cellIndex = row * 6 + unit.index;
+                            cells[cellIndex].classList.add('complete-flash');
+                            setTimeout(() => {
+                                cells[cellIndex].classList.remove('complete-flash');
+                            }, 600);
+                        }
+                    } else if (unit.type === 'box') {
+                        // Animate entire box
+                        for (let i = 0; i < 2; i++) {
+                            for (let j = 0; j < 3; j++) {
+                                const row = unit.boxRow + i;
+                                const col = unit.boxCol + j;
+                                const cellIndex = row * 6 + col;
+                                cells[cellIndex].classList.add('complete-flash');
+                                setTimeout(() => {
+                                    cells[cellIndex].classList.remove('complete-flash');
+                                }, 600);
+                            }
+                        }
+                    }
+                });
+            },
+
+            inputNumber(num) {
+                if (!this.selectedCell) return;
+                const [row, col] = this.selectedCell;
+                if (this.initialGrid[row][col] !== 0) return;
+
+                if (this.mode === 'normal') {
+                    // Save to history for undo
+                    this.history.push({
+                        row,
+                        col,
+                        oldValue: this.grid[row][col],
+                        newValue: num,
+                        oldNotes: this.notes[`${row}-${col}`] ? [...this.notes[`${row}-${col}`]] : null
+                    });
+
+                    this.grid[row][col] = num;
+                    delete this.notes[`${row}-${col}`];
+                    this.render();
+                    
+                    // Check for completed units AFTER rendering
+                    setTimeout(() => {
+                        this.checkUnitComplete(row, col);
+                        this.checkComplete();
+                    }, 50);
+                } else {
+                    const key = `${row}-${col}`;
+                    const cellNotes = this.notes[key] || [];
+                    if (cellNotes.includes(num)) {
+                        this.notes[key] = cellNotes.filter(n => n !== num);
+                        if (this.notes[key].length === 0) delete this.notes[key];
+                    } else {
+                        this.notes[key] = [...cellNotes, num].sort();
+                    }
+                    this.render();
+                }
+            },
+
+            undo() {
+                if (this.history.length === 0) {
+                    this.showMessage('Nothing to undo', 'info');
+                    setTimeout(() => this.hideMessage(), 1500);
+                    return;
+                }
+
+                const lastMove = this.history.pop();
+                this.grid[lastMove.row][lastMove.col] = lastMove.oldValue;
+                
+                if (lastMove.oldNotes) {
+                    this.notes[`${lastMove.row}-${lastMove.col}`] = lastMove.oldNotes;
+                } else {
+                    delete this.notes[`${lastMove.row}-${lastMove.col}`];
+                }
+
+                this.selectedCell = [lastMove.row, lastMove.col];
+                this.render();
+            },
+
+            clearCell() {
+                if (!this.selectedCell) return;
+                const [row, col] = this.selectedCell;
+                if (this.initialGrid[row][col] !== 0) return;
+
+                // Save to history for undo
+                if (this.grid[row][col] !== 0) {
+                    this.history.push({
+                        row,
+                        col,
+                        oldValue: this.grid[row][col],
+                        newValue: 0,
+                        oldNotes: this.notes[`${row}-${col}`] ? [...this.notes[`${row}-${col}`]] : null
+                    });
+                }
+
+                this.grid[row][col] = 0;
+                delete this.notes[`${row}-${col}`];
+                this.render();
+            },
+
+            getHint() {
+                const hint = this.getSmartHint(this.grid);
+                if (!hint) {
+                    this.showMessage('No hints available!', 'info');
+                    return;
+                }
+
+                this.currentHint = hint;
+                this.highlightedCells = hint.cells || [];
+
+                let message = '';
+                if (this.hintLevel === 'strategy') {
+                    message = `💡 Try: ${hint.type}`;
+                } else if (this.hintLevel === 'location') {
+                    message = `💡 ${hint.type}: Look at row ${hint.row + 1}, column ${hint.col + 1}`;
+                } else {
+                    message = `💡 ${hint.type}: ${hint.explanation}`;
+                }
+
+                this.showMessage(message, 'info');
+                this.render();
+
+                setTimeout(() => {
+                    this.highlightedCells = [];
+                    this.render();
+                }, 5000);
+            },
+
+            applyHint() {
+                if (!this.currentHint || this.currentHint.value === null) {
+                    this.showMessage('Get a hint first!', 'info');
+                    return;
+                }
+
+                this.grid[this.currentHint.row][this.currentHint.col] = this.currentHint.value;
+                this.currentHint = null;
+                this.highlightedCells = [];
+                this.checkComplete();
+                this.render();
+                this.showMessage('Hint applied!', 'success');
+                setTimeout(() => this.hideMessage(), 2000);
+            },
+
+            solveAll() {
+                this.grid = this.solution.map(row => [...row]);
+                this.isRunning = false;
+                this.render();
+                this.showMessage('Puzzle solved!', 'success');
+            },
+
+            checkComplete() {
+                const isFilled = this.grid.every(row => row.every(cell => cell !== 0));
+                if (isFilled) {
+                    const isCorrect = this.grid.every((row, i) => 
+                        row.every((cell, j) => cell === this.solution[i][j])
+                    );
+                    if (isCorrect) {
+                        this.isRunning = false;
+                        const mins = Math.floor(this.timer / 60);
+                        const secs = this.timer % 60;
+                        this.showMessage(`🎉 Solved in ${mins}:${secs.toString().padStart(2, '0')}!`, 'success');
+                    } else {
+                        this.showMessage('Some cells are incorrect!', 'error');
+                        setTimeout(() => this.hideMessage(), 3000);
+                    }
+                }
+            },
+
+            showMessage(text, type) {
+                const msg = document.getElementById('message');
+                msg.textContent = text;
+                msg.className = `message ${type}`;
+                msg.style.display = 'block';
+            },
+
+            hideMessage() {
+                document.getElementById('message').style.display = 'none';
+            },
+
+            showInstallInstructions() {
+                // Check if already installed or dismissed
+                if (window.matchMedia('(display-mode: standalone)').matches) {
+                    return; // Already installed
+                }
+
+                if (localStorage.getItem('installBannerDismissed')) {
+                    return; // User dismissed it
+                }
+
+                const banner = document.getElementById('installBanner');
+                const instructions = document.getElementById('installInstructions');
+                
+                // Detect platform
+                const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+                const isAndroid = /Android/.test(navigator.userAgent);
+                
+                if (isIOS) {
+                    instructions.innerHTML = '🍎 Safari: Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>';
+                    banner.style.display = 'block';
+                } else if (isAndroid) {
+                    instructions.innerHTML = '🤖 Chrome: Tap <strong>⋮</strong> menu → <strong>Add to Home screen</strong>';
+                    banner.style.display = 'block';
+                } else {
+                    // Desktop or other browsers
+                    instructions.innerHTML = '💻 Install this app for quick access!';
+                    banner.style.display = 'block';
+                }
+            },
+
+            dismissInstallBanner() {
+                document.getElementById('installBanner').style.display = 'none';
+                localStorage.setItem('installBannerDismissed', 'true');
+            },
+
+            render() {
+                const gridEl = document.getElementById('grid');
+                gridEl.innerHTML = '';
+
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        
+                        const isGiven = this.initialGrid[row][col] !== 0;
+                        const isSelected = this.selectedCell && this.selectedCell[0] === row && this.selectedCell[1] === col;
+                        const isHighlighted = this.highlightedCells.some(([r, c]) => r === row && c === col);
+                        
+                        if (isGiven) cell.classList.add('given');
+                        if (isSelected) cell.classList.add('selected');
+                        if (isHighlighted) cell.classList.add('highlighted');
+                        if (!isGiven && this.grid[row][col] !== 0) cell.classList.add('user-input');
+
+                        const key = `${row}-${col}`;
+                        const cellNotes = this.notes[key] || [];
+                        
+                        if (cellNotes.length > 0 && this.grid[row][col] === 0) {
+                            const notesDiv = document.createElement('div');
+                            notesDiv.className = 'notes';
+                            for (let num = 1; num <= 6; num++) {
+                                const noteEl = document.createElement('div');
+                                noteEl.className = 'note';
+                                noteEl.textContent = cellNotes.includes(num) ? num : '';
+                                notesDiv.appendChild(noteEl);
+                            }
+                            cell.appendChild(notesDiv);
+                        } else if (this.grid[row][col] !== 0) {
+                            cell.textContent = this.grid[row][col];
+                        }
+
+                        cell.onclick = () => this.selectCell(row, col);
+                        gridEl.appendChild(cell);
+                    }
+                }
+            }
+        };
+
+        window.onload = () => {
+            app.init();
+            
+            // Show install instructions based on platform
+            app.showInstallInstructions();
+            
+            // Register service worker for PWA
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered', reg))
+                    .catch(err => console.log('Service Worker registration failed', err));
+            }
+        };
+    </script>
+</body>
+</html>

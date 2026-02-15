@@ -549,6 +549,7 @@
                     <button class="option-btn active" data-value="medium">Medium</button>
                     <button class="option-btn" data-value="hard">Hard</button>
                     <button class="option-btn" data-value="expert">Expert</button>
+                    <button class="option-btn" data-value="ultra">Ultra</button>
                 </div>
             </div>
 
@@ -685,7 +686,8 @@
                     easy: 12,      // More clues = easier
                     medium: 18,    // Moderate clues
                     hard: 22,      // Fewer clues = harder
-                    expert: 24     // Very few clues (reduced to ensure solvability)
+                    expert: 24,    // Very few clues
+                    ultra: 27      // Extreme - requires X-Wing, Y-Wing, BUG
                 }[difficulty] || 18;
 
                 // Collect all cell positions and shuffle them
@@ -828,7 +830,7 @@
                 // Basic techniques (all difficulties)
                 let hint = this.findNakedSingle(grid);
                 if (hint) return hint;
-                
+
                 hint = this.findHiddenSingle(grid);
                 if (hint) return hint;
 
@@ -845,14 +847,23 @@
                 }
 
                 // Advanced techniques (hard+)
-                if (this.difficulty === 'hard' || this.difficulty === 'expert') {
+                if (this.difficulty === 'hard' || this.difficulty === 'expert' || this.difficulty === 'ultra') {
                     hint = this.findXWing(grid);
                     if (hint) return hint;
                 }
 
                 // Expert techniques
-                if (this.difficulty === 'expert') {
+                if (this.difficulty === 'expert' || this.difficulty === 'ultra') {
                     hint = this.findYWing(grid);
+                    if (hint) return hint;
+                }
+
+                // Ultra expert techniques
+                if (this.difficulty === 'ultra') {
+                    hint = this.findBUG(grid);
+                    if (hint) return hint;
+
+                    hint = this.findSwordfish(grid);
                     if (hint) return hint;
                 }
 
@@ -861,11 +872,15 @@
                     for (let col = 0; col < 6; col++) {
                         if (grid[row][col] === 0) {
                             const candidates = this.getCandidates(grid, row, col);
+                            const difficultyHints = {
+                                'expert': ' Try X-Wing or Y-Wing patterns.',
+                                'ultra': ' Try BUG, Swordfish, or advanced chains.'
+                            };
                             return {
                                 type: 'General Hint',
                                 row, col,
                                 value: null,
-                                explanation: `Cell (${row + 1}, ${col + 1}) has ${candidates.length} candidates: ${candidates.join(', ')}.${this.difficulty === 'expert' ? ' Try advanced techniques like coloring or chains.' : ''}`,
+                                explanation: `Cell (${row + 1}, ${col + 1}) has ${candidates.length} candidates: ${candidates.join(', ')}.${difficultyHints[this.difficulty] || ''}`,
                                 cells: [[row, col]]
                             };
                         }
@@ -1070,9 +1085,118 @@
                 return null;
             },
 
+            // BUG (Bivalue Universal Grave) - if all unsolved cells have 2 candidates
+            // except one cell with 3, that cell's value is the candidate appearing 3 times
+            findBUG(grid) {
+                const cellCandidates = [];
+                let triValueCell = null;
+
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (grid[row][col] === 0) {
+                            const cands = this.getCandidates(grid, row, col);
+                            if (cands.length === 2) {
+                                cellCandidates.push({ row, col, cands });
+                            } else if (cands.length === 3) {
+                                if (triValueCell) return null; // More than one 3-candidate cell
+                                triValueCell = { row, col, cands };
+                            } else {
+                                return null; // Cell with 1 or 4+ candidates breaks BUG pattern
+                            }
+                        }
+                    }
+                }
+
+                if (!triValueCell) return null;
+
+                // Find which candidate appears 3 times in row/col/box
+                for (const cand of triValueCell.cands) {
+                    // Count occurrences in row
+                    let rowCount = 0;
+                    for (let c = 0; c < 6; c++) {
+                        if (grid[triValueCell.row][c] === 0) {
+                            const cellCands = this.getCandidates(grid, triValueCell.row, c);
+                            if (cellCands.includes(cand)) rowCount++;
+                        }
+                    }
+
+                    // Count occurrences in column
+                    let colCount = 0;
+                    for (let r = 0; r < 6; r++) {
+                        if (grid[r][triValueCell.col] === 0) {
+                            const cellCands = this.getCandidates(grid, r, triValueCell.col);
+                            if (cellCands.includes(cand)) colCount++;
+                        }
+                    }
+
+                    // In a BUG, each candidate appears exactly twice in each unit
+                    // The solution is the candidate that appears 3 times (odd count)
+                    if (rowCount % 2 === 1 || colCount % 2 === 1) {
+                        return {
+                            type: 'BUG (Bivalue Universal Grave)',
+                            row: triValueCell.row,
+                            col: triValueCell.col,
+                            value: cand,
+                            explanation: `BUG detected! All cells have 2 candidates except (${triValueCell.row + 1}, ${triValueCell.col + 1}) with 3. The answer is ${cand} (appears odd number of times in its units).`,
+                            cells: [[triValueCell.row, triValueCell.col]]
+                        };
+                    }
+                }
+                return null;
+            },
+
+            // Swordfish - like X-Wing but with 3 rows/columns
+            findSwordfish(grid) {
+                for (let num = 1; num <= 6; num++) {
+                    // Find rows where num appears in exactly 2-3 positions
+                    const rowData = [];
+                    for (let row = 0; row < 6; row++) {
+                        const cols = [];
+                        for (let col = 0; col < 6; col++) {
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
+                                cols.push(col);
+                            }
+                        }
+                        if (cols.length >= 2 && cols.length <= 3) {
+                            rowData.push({ row, cols });
+                        }
+                    }
+
+                    // Need at least 3 rows for Swordfish
+                    if (rowData.length >= 3) {
+                        // Try all combinations of 3 rows
+                        for (let i = 0; i < rowData.length - 2; i++) {
+                            for (let j = i + 1; j < rowData.length - 1; j++) {
+                                for (let k = j + 1; k < rowData.length; k++) {
+                                    const allCols = new Set([
+                                        ...rowData[i].cols,
+                                        ...rowData[j].cols,
+                                        ...rowData[k].cols
+                                    ]);
+                                    // Swordfish: 3 rows share exactly 3 columns
+                                    if (allCols.size === 3) {
+                                        return {
+                                            type: 'Swordfish',
+                                            explanation: `Swordfish: ${num} in rows ${rowData[i].row + 1}, ${rowData[j].row + 1}, ${rowData[k].row + 1} is confined to columns ${[...allCols].map(c => c + 1).join(', ')}. Eliminates ${num} from other cells in those columns.`,
+                                            cells: [
+                                                ...rowData[i].cols.map(c => [rowData[i].row, c]),
+                                                ...rowData[j].cols.map(c => [rowData[j].row, c]),
+                                                ...rowData[k].cols.map(c => [rowData[k].row, c])
+                                            ],
+                                            value: num
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return null;
+            },
+
             newPuzzle() {
                 const { puzzle, solution } = this.generatePuzzle(this.difficulty);
-                
+
                 // Verify the puzzle is valid
                 console.log('Generated puzzle:', puzzle);
                 console.log('Solution:', solution);

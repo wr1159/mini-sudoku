@@ -455,6 +455,105 @@
             color: #333;
         }
 
+        .stats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #f8f8f8;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .stat-row .label {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .stat-row .value {
+            color: #666;
+        }
+
+        .stat-row .count {
+            background: #1a73e8;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .stats-empty {
+            color: #999;
+            font-size: 13px;
+            text-align: center;
+            padding: 12px;
+        }
+
+        .stats-chart {
+            background: #f8f8f8;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+
+        .stats-chart svg {
+            width: 100%;
+            height: auto;
+        }
+
+        .chart-summary {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+            padding: 0 4px;
+        }
+
+        .chart-summary .stat {
+            text-align: center;
+        }
+
+        .chart-summary .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .chart-summary .stat-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #999;
+        }
+
+        .new-game-btn {
+            display: none;
+            width: 100%;
+            padding: 14px;
+            margin-top: 8px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .new-game-btn.show {
+            display: block;
+        }
+
+        .new-game-btn:active {
+            background: #1557b0;
+        }
+
         /* Responsive */
         @media (max-width: 360px) {
             .cell {
@@ -485,6 +584,7 @@
                 </div>
             </div>
             <div class="top-bar-right">
+                <button class="menu-btn" onclick="app.openStats()" title="Stats">📊</button>
                 <button class="settings-btn" onclick="app.openSettings()">
                     Settings <span>▾</span>
                 </button>
@@ -500,6 +600,7 @@
 
         <!-- Message area -->
         <div id="message" style="display: none;"></div>
+        <button class="new-game-btn" id="newGameBtn" onclick="app.newPuzzle()">New Game</button>
 
         <!-- Grid -->
         <div class="grid-wrapper">
@@ -534,6 +635,37 @@
                 <span class="icon">↺</span>
                 <span>Undo</span>
             </button>
+        </div>
+    </div>
+
+    <!-- Stats Modal -->
+    <div class="modal-overlay" id="statsModal" onclick="app.closeStatsOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width: 360px;">
+            <h2>Stats</h2>
+
+            <div class="modal-section">
+                <label>Filter by Difficulty</label>
+                <div class="option-group" id="statsFilterOptions">
+                    <button class="option-btn active" data-value="all" onclick="app.filterStats('all')">All</button>
+                    <button class="option-btn" data-value="easy" onclick="app.filterStats('easy')">Easy</button>
+                    <button class="option-btn" data-value="medium" onclick="app.filterStats('medium')">Medium</button>
+                    <button class="option-btn" data-value="hard" onclick="app.filterStats('hard')">Hard</button>
+                    <button class="option-btn" data-value="expert" onclick="app.filterStats('expert')">Expert</button>
+                </div>
+            </div>
+
+            <div class="modal-section">
+                <label>Solve Time Progress</label>
+                <div id="statsChart" class="stats-chart">
+                    <svg id="chartSvg" viewBox="0 0 320 160"></svg>
+                </div>
+                <div id="chartSummary" class="chart-summary"></div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="modal-btn secondary" onclick="app.resetStats()">Reset</button>
+                <button class="modal-btn primary" onclick="app.closeStats()">Close</button>
+            </div>
         </div>
     </div>
 
@@ -603,9 +735,210 @@
             history: [], // For undo functionality
             difficulty: 'medium',
 
+            // Stats tracking
+            stats: {
+                gamesByDifficulty: {},  // { 'easy': [{time: 120, date: ...}, ...], ... }
+            },
+            statsFilter: 'all',
+
             init() {
+                this.loadStats();
                 this.initSettingsListeners();
                 this.newPuzzle();
+            },
+
+            loadStats() {
+                try {
+                    const saved = localStorage.getItem('sudokuStats');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        this.stats = {
+                            gamesByDifficulty: parsed.gamesByDifficulty || {}
+                        };
+                    }
+                } catch (e) {
+                    console.error('Failed to load stats:', e);
+                    this.stats = { gamesByDifficulty: {} };
+                }
+            },
+
+            saveStats() {
+                try {
+                    localStorage.setItem('sudokuStats', JSON.stringify(this.stats));
+                } catch (e) {
+                    console.error('Failed to save stats:', e);
+                }
+            },
+
+            trackGameComplete(difficulty, time) {
+                if (!this.stats.gamesByDifficulty[difficulty]) {
+                    this.stats.gamesByDifficulty[difficulty] = [];
+                }
+                this.stats.gamesByDifficulty[difficulty].push({
+                    time,
+                    date: new Date().toISOString()
+                });
+                // Keep only last 50 games per difficulty
+                if (this.stats.gamesByDifficulty[difficulty].length > 50) {
+                    this.stats.gamesByDifficulty[difficulty].shift();
+                }
+                this.saveStats();
+            },
+
+            getAverageTime(difficulty) {
+                const games = this.stats.gamesByDifficulty[difficulty];
+                if (!games || games.length === 0) return null;
+                const total = games.reduce((sum, g) => sum + g.time, 0);
+                return Math.round(total / games.length);
+            },
+
+            formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            },
+
+            openStats() {
+                this.statsFilter = 'all';
+                this.updateStatsFilterUI();
+                this.updateStatsDisplay();
+                document.getElementById('statsModal').classList.add('show');
+            },
+
+            closeStats() {
+                document.getElementById('statsModal').classList.remove('show');
+            },
+
+            closeStatsOnOverlay(event) {
+                if (event.target === event.currentTarget) {
+                    this.closeStats();
+                }
+            },
+
+            resetStats() {
+                if (confirm('Reset all stats? This cannot be undone.')) {
+                    this.stats = { gamesByDifficulty: {} };
+                    this.saveStats();
+                    this.updateStatsDisplay();
+                }
+            },
+
+            filterStats(difficulty) {
+                this.statsFilter = difficulty;
+                this.updateStatsFilterUI();
+                this.updateStatsDisplay();
+            },
+
+            updateStatsFilterUI() {
+                document.querySelectorAll('#statsFilterOptions .option-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.value === this.statsFilter);
+                });
+            },
+
+            getFilteredGames() {
+                const difficulties = this.statsFilter === 'all'
+                    ? ['easy', 'medium', 'hard', 'expert', 'ultra']
+                    : [this.statsFilter];
+
+                let games = [];
+                difficulties.forEach(diff => {
+                    const diffGames = this.stats.gamesByDifficulty[diff] || [];
+                    diffGames.forEach((g, i) => {
+                        games.push({ ...g, difficulty: diff, index: i });
+                    });
+                });
+
+                // Sort by date
+                games.sort((a, b) => new Date(a.date) - new Date(b.date));
+                return games;
+            },
+
+            updateStatsDisplay() {
+                const games = this.getFilteredGames();
+                const svg = document.getElementById('chartSvg');
+                const summary = document.getElementById('chartSummary');
+
+                if (games.length === 0) {
+                    svg.innerHTML = '<text x="160" y="85" text-anchor="middle" fill="#999" font-size="13">No games completed yet</text>';
+                    summary.innerHTML = '';
+                    return;
+                }
+
+                // Chart dimensions
+                const width = 320;
+                const height = 160;
+                const padding = { top: 20, right: 20, bottom: 30, left: 45 };
+                const chartWidth = width - padding.left - padding.right;
+                const chartHeight = height - padding.top - padding.bottom;
+
+                // Calculate scales
+                const times = games.map(g => g.time);
+                const maxTime = Math.max(...times);
+                const minTime = Math.min(...times);
+                const timeRange = maxTime - minTime || 60;
+                const yMin = Math.max(0, minTime - timeRange * 0.1);
+                const yMax = maxTime + timeRange * 0.1;
+
+                const xScale = (i) => padding.left + (i / (games.length - 1 || 1)) * chartWidth;
+                const yScale = (t) => padding.top + chartHeight - ((t - yMin) / (yMax - yMin)) * chartHeight;
+
+                // Build SVG
+                let svgContent = '';
+
+                // Y-axis labels
+                const yTicks = 4;
+                for (let i = 0; i <= yTicks; i++) {
+                    const val = yMin + (yMax - yMin) * (i / yTicks);
+                    const y = yScale(val);
+                    svgContent += `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="#e0e0e0" stroke-width="1"/>`;
+                    svgContent += `<text x="${padding.left - 5}" y="${y + 4}" text-anchor="end" fill="#999" font-size="10">${this.formatTime(Math.round(val))}</text>`;
+                }
+
+                // X-axis
+                svgContent += `<line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#ccc" stroke-width="1"/>`;
+                svgContent += `<text x="${width / 2}" y="${height - 8}" text-anchor="middle" fill="#999" font-size="10">Games (${games.length})</text>`;
+
+                // Line path
+                if (games.length > 1) {
+                    let pathD = `M ${xScale(0)} ${yScale(games[0].time)}`;
+                    for (let i = 1; i < games.length; i++) {
+                        pathD += ` L ${xScale(i)} ${yScale(games[i].time)}`;
+                    }
+                    svgContent += `<path d="${pathD}" fill="none" stroke="#1a73e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+                }
+
+                // Points
+                const diffColors = { easy: '#10b981', medium: '#f59e0b', hard: '#ef4444', expert: '#8b5cf6', ultra: '#ec4899' };
+                games.forEach((g, i) => {
+                    const color = diffColors[g.difficulty] || '#1a73e8';
+                    svgContent += `<circle cx="${xScale(i)}" cy="${yScale(g.time)}" r="4" fill="${color}" stroke="white" stroke-width="1.5"/>`;
+                });
+
+                svg.innerHTML = svgContent;
+
+                // Summary stats
+                const avgTime = Math.round(times.reduce((a, b) => a + b, 0) / times.length);
+                const bestTime = Math.min(...times);
+                const latestTime = times[times.length - 1];
+
+                summary.innerHTML = `
+                    <div class="stat">
+                        <div class="stat-value">${this.formatTime(bestTime)}</div>
+                        <div class="stat-label">Best</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${this.formatTime(avgTime)}</div>
+                        <div class="stat-label">Average</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${this.formatTime(latestTime)}</div>
+                        <div class="stat-label">Latest</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${games.length}</div>
+                        <div class="stat-label">Games</div>
+                    </div>
+                `;
             },
 
             isValid(grid, row, col, num) {
@@ -1216,6 +1549,7 @@
                 this.render();
                 this.hideMessage();
                 this.updateTimerButton();
+                document.getElementById('newGameBtn').classList.remove('show');
             },
 
             changeDifficulty(newDifficulty) {
@@ -1569,14 +1903,27 @@
             checkComplete() {
                 const isFilled = this.grid.every(row => row.every(cell => cell !== 0));
                 if (isFilled) {
-                    const isCorrect = this.grid.every((row, i) => 
+                    const isCorrect = this.grid.every((row, i) =>
                         row.every((cell, j) => cell === this.solution[i][j])
                     );
                     if (isCorrect) {
                         this.isRunning = false;
-                        const mins = Math.floor(this.timer / 60);
-                        const secs = this.timer % 60;
-                        this.showMessage(`🎉 Solved in ${mins}:${secs.toString().padStart(2, '0')}!`, 'success');
+                        this.trackGameComplete(this.difficulty, this.timer);
+
+                        const timeStr = this.formatTime(this.timer);
+                        const avg = this.getAverageTime(this.difficulty);
+                        let message = `🎉 Solved in ${timeStr}!`;
+                        if (avg) {
+                            const diff = this.timer - avg;
+                            const diffStr = this.formatTime(Math.abs(diff));
+                            if (diff < 0) {
+                                message += ` (${diffStr} faster than avg)`;
+                            } else if (diff > 0) {
+                                message += ` (${diffStr} slower than avg)`;
+                            }
+                        }
+                        this.showMessage(message, 'success');
+                        document.getElementById('newGameBtn').classList.add('show');
                     } else {
                         this.showMessage('Some cells are incorrect!', 'error');
                         setTimeout(() => this.hideMessage(), 3000);
@@ -1680,13 +2027,15 @@
 
             // Keyboard input support
             document.addEventListener('keydown', (e) => {
-                // Escape to close modal
+                // Escape to close modals
                 if (e.key === 'Escape') {
                     app.closeSettings();
+                    app.closeStats();
                     return;
                 }
                 // Don't handle other keys if modal is open
-                if (document.getElementById('settingsModal').classList.contains('show')) {
+                if (document.getElementById('settingsModal').classList.contains('show') ||
+                    document.getElementById('statsModal').classList.contains('show')) {
                     return;
                 }
                 // Number keys 1-6

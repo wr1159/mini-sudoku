@@ -1,7 +1,8 @@
-const CACHE_NAME = 'mini-sudoku-v1';
+const CACHE_NAME = 'mini-sudoku-v2';
 const urlsToCache = [
-  './linkedin-sudoku.html',
-  './manifest.json'
+  '/mini-sudoku/',
+  '/mini-sudoku/index.html',
+  '/mini-sudoku/manifest.json'
 ];
 
 // Install service worker and cache files

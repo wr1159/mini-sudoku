@@ -2,7 +2,7 @@
   "name": "Mini Sudoku 6×6",
   "short_name": "Mini Sudoku",
   "description": "Play 6×6 Mini Sudoku with smart hints and LinkedIn theme",
-  "start_url": "./linkedin-sudoku.html",
+  "start_url": "/mini-sudoku/",
   "display": "standalone",
   "background_color": "#f3f2ef",
   "theme_color": "#0a66c2",

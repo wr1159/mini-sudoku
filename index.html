@@ -1010,38 +1010,34 @@
             },
 
             checkUnitComplete(row, col) {
-                // Check if a row is complete and correct
+                // Check if a row matches the solution
                 const checkRow = (r) => {
-                    const rowCells = this.grid[r];
-                    if (rowCells.some(c => c === 0)) return false;
-                    const expected = [1, 2, 3, 4, 5, 6].sort();
-                    const actual = [...rowCells].sort();
-                    return expected.every((val, i) => val === actual[i]);
+                    for (let c = 0; c < 6; c++) {
+                        if (this.grid[r][c] !== this.solution[r][c]) return false;
+                    }
+                    return true;
                 };
 
-                // Check if a column is complete and correct
+                // Check if a column matches the solution
                 const checkCol = (c) => {
-                    const colCells = this.grid.map(row => row[c]);
-                    if (colCells.some(cell => cell === 0)) return false;
-                    const expected = [1, 2, 3, 4, 5, 6].sort();
-                    const actual = [...colCells].sort();
-                    return expected.every((val, i) => val === actual[i]);
+                    for (let r = 0; r < 6; r++) {
+                        if (this.grid[r][c] !== this.solution[r][c]) return false;
+                    }
+                    return true;
                 };
 
-                // Check if a box is complete and correct
+                // Check if a box matches the solution
                 const checkBox = (r, c) => {
                     const boxRow = Math.floor(r / 2) * 2;
                     const boxCol = Math.floor(c / 3) * 3;
-                    const boxCells = [];
                     for (let i = 0; i < 2; i++) {
                         for (let j = 0; j < 3; j++) {
-                            boxCells.push(this.grid[boxRow + i][boxCol + j]);
+                            const br = boxRow + i;
+                            const bc = boxCol + j;
+                            if (this.grid[br][bc] !== this.solution[br][bc]) return false;
                         }
                     }
-                    if (boxCells.some(cell => cell === 0)) return false;
-                    const expected = [1, 2, 3, 4, 5, 6].sort();
-                    const actual = [...boxCells].sort();
-                    return expected.every((val, i) => val === actual[i]);
+                    return true;
                 };
 
                 const completedUnits = [];

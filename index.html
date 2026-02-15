@@ -523,9 +523,37 @@
                 return true;
             },
 
+            // Count solutions (stops at 2 since we only need to know if unique)
+            countSolutions(grid, count = { value: 0 }) {
+                if (count.value >= 2) return count.value; // Early exit if multiple found
+
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (grid[row][col] === 0) {
+                            for (let num = 1; num <= 6; num++) {
+                                if (this.isValid(grid, row, col, num)) {
+                                    grid[row][col] = num;
+                                    this.countSolutions(grid, count);
+                                    grid[row][col] = 0;
+                                    if (count.value >= 2) return count.value;
+                                }
+                            }
+                            return count.value;
+                        }
+                    }
+                }
+                count.value++;
+                return count.value;
+            },
+
+            hasUniqueSolution(grid) {
+                const gridCopy = grid.map(row => [...row]);
+                return this.countSolutions(gridCopy) === 1;
+            },
+
             generatePuzzle(difficulty = 'medium') {
                 const grid = Array(6).fill(null).map(() => Array(6).fill(0));
-                
+
                 // Fill the first row with random numbers
                 const firstRow = [1, 2, 3, 4, 5, 6].sort(() => Math.random() - 0.5);
                 for (let col = 0; col < 6; col++) {
@@ -535,29 +563,46 @@
                 // Solve the rest
                 this.solve(grid);
                 const solution = grid.map(row => [...row]);
-                
-                const cellsToRemove = { 
+
+                const cellsToRemove = {
                     easy: 12,      // More clues = easier
                     medium: 18,    // Moderate clues
                     hard: 22,      // Fewer clues = harder
-                    expert: 25     // Very few clues = needs advanced techniques
+                    expert: 24     // Very few clues (reduced to ensure solvability)
                 }[difficulty] || 18;
-                
+
+                // Collect all cell positions and shuffle them
+                const positions = [];
+                for (let r = 0; r < 6; r++) {
+                    for (let c = 0; c < 6; c++) {
+                        positions.push([r, c]);
+                    }
+                }
+                // Shuffle positions randomly
+                for (let i = positions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [positions[i], positions[j]] = [positions[j], positions[i]];
+                }
+
                 let removed = 0;
-                const attempts = new Set();
-                
-                while (removed < cellsToRemove && attempts.size < 100) {
-                    const row = Math.floor(Math.random() * 6);
-                    const col = Math.floor(Math.random() * 6);
-                    const key = `${row}-${col}`;
-                    
-                    if (grid[row][col] !== 0 && !attempts.has(key)) {
-                        attempts.add(key);
-                        grid[row][col] = 0;
+
+                // Try to remove cells while maintaining unique solution
+                for (const [row, col] of positions) {
+                    if (removed >= cellsToRemove) break;
+
+                    const backup = grid[row][col];
+                    grid[row][col] = 0;
+
+                    // Check if puzzle still has unique solution
+                    if (this.hasUniqueSolution(grid)) {
                         removed++;
+                    } else {
+                        // Restore the cell - removing it creates multiple solutions
+                        grid[row][col] = backup;
                     }
                 }
 
+                console.log(`Generated ${difficulty} puzzle: removed ${removed}/${cellsToRemove} cells (unique solution guaranteed)`);
                 return { puzzle: grid, solution };
             },
 

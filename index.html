@@ -554,6 +554,92 @@
             background: #1557b0;
         }
 
+        /* Archive View */
+        .archive-view {
+            background: white;
+            max-width: 420px;
+            width: 100%;
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .archive-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .archive-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .archive-back-btn {
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            color: #1a73e8;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .archive-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 12px;
+        }
+
+        .archive-level {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            margin-bottom: 8px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .archive-level:hover {
+            background: #f0f0f0;
+        }
+
+        .archive-level:active {
+            background: #e8e8e8;
+        }
+
+        .level-name {
+            flex: 1;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .level-time {
+            font-size: 14px;
+            color: #666;
+            margin-right: 12px;
+            font-family: monospace;
+        }
+
+        .level-status {
+            font-size: 16px;
+            color: #10b981;
+            width: 20px;
+            text-align: center;
+        }
+
+        .archive-empty {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-size: 14px;
+        }
+
         /* Responsive */
         @media (max-width: 360px) {
             .cell {
@@ -584,11 +670,12 @@
                 </div>
             </div>
             <div class="top-bar-right">
+                <button class="menu-btn" onclick="app.openArchive()" title="Levels">📚</button>
                 <button class="menu-btn" onclick="app.openStats()" title="Stats">📊</button>
                 <button class="settings-btn" onclick="app.openSettings()">
                     Settings <span>▾</span>
                 </button>
-                <button class="menu-btn" onclick="app.newPuzzle()">⟳</button>
+                <button class="menu-btn" onclick="app.handleNewGame()">⟳</button>
             </div>
         </div>
 
@@ -635,6 +722,18 @@
                 <span class="icon">↺</span>
                 <span>Undo</span>
             </button>
+        </div>
+    </div>
+
+    <!-- Archive View (full screen) -->
+    <div class="archive-view" id="archiveView" style="display: none;">
+        <div class="archive-header">
+            <button class="archive-back-btn" onclick="app.closeArchive()">← Back</button>
+            <h2>Levels</h2>
+            <div style="width: 60px;"></div>
+        </div>
+        <div class="archive-list" id="archiveLevelList">
+            <!-- Levels rendered dynamically -->
         </div>
     </div>
 
@@ -741,8 +840,30 @@
             },
             statsFilter: 'all',
 
+            // Archive mode
+            currentMode: 'random',      // 'random' | 'archive'
+            currentLevelId: null,
+            archiveProgress: {},        // { "1": { bestTime: 145, completedAt: "..." }, ... }
+
+            // Hardcoded archive levels (add your puzzles here)
+            LEVELS: [
+                { id: 1, grid: "123450050030004060000310500020000000", solution: "123456456132314265265314541623632541" },
+                { id: 2, grid: "100005020030003500001400040050300006", solution: "134625526134463512251463642351315246" },
+                { id: 3, grid: "123400500000600000000001000003004265", solution: "123456546312631524452631265143314265" },
+                { id: 4, grid: "600001500003040020030050002400001600", solution: "623541514263145326236154362415451632" },
+                { id: 5, grid: "003200040010050000060040001300000000", solution: "513264246513154632362145421356635421" },
+                { id: 6, grid: "100000005230204005306004401003000000", solution: "132546645231214365356124421653563412" },
+                { id: 7, grid: "000000012340040020050030036450000000", solution: "364215512346643521251634136452425163" },
+                { id: 8, grid: "200000100400000502000003050000000056", solution: "245361136425361542524613652134413256" },
+                { id: 188, grid: "001000000103000020030000204000000500", solution: "361254425163146325532416254631613542" },
+
+
+
+            ],
+
             init() {
                 this.loadStats();
+                this.loadArchiveProgress();
                 this.initSettingsListeners();
                 this.newPuzzle();
             },
@@ -768,6 +889,111 @@
                 } catch (e) {
                     console.error('Failed to save stats:', e);
                 }
+            },
+
+            // Archive functions
+            loadArchiveProgress() {
+                try {
+                    const saved = localStorage.getItem('archiveProgress');
+                    if (saved) {
+                        this.archiveProgress = JSON.parse(saved);
+                    }
+                } catch (e) {
+                    console.error('Failed to load archive progress:', e);
+                    this.archiveProgress = {};
+                }
+            },
+
+            saveArchiveProgress() {
+                try {
+                    localStorage.setItem('archiveProgress', JSON.stringify(this.archiveProgress));
+                } catch (e) {
+                    console.error('Failed to save archive progress:', e);
+                }
+            },
+
+            encodeGrid(grid) {
+                return grid.map(row => row.join('')).join('');
+            },
+
+            decodeGrid(str) {
+                const grid = [];
+                for (let i = 0; i < 6; i++) {
+                    const row = [];
+                    for (let j = 0; j < 6; j++) {
+                        row.push(parseInt(str[i * 6 + j]) || 0);
+                    }
+                    grid.push(row);
+                }
+                return grid;
+            },
+
+            openArchive() {
+                document.querySelector('.container').style.display = 'none';
+                document.getElementById('archiveView').style.display = 'flex';
+                this.renderArchiveList();
+            },
+
+            closeArchive() {
+                document.getElementById('archiveView').style.display = 'none';
+                document.querySelector('.container').style.display = 'flex';
+            },
+
+            renderArchiveList() {
+                const list = document.getElementById('archiveLevelList');
+                if (this.LEVELS.length === 0) {
+                    list.innerHTML = '<div class="archive-empty">No levels yet. Use creator.html to add puzzles.</div>';
+                    return;
+                }
+
+                list.innerHTML = this.LEVELS.map(level => {
+                    const progress = this.archiveProgress[level.id];
+                    const completed = progress && progress.bestTime;
+                    const timeStr = completed ? this.formatTime(progress.bestTime) : '--:--';
+                    return `
+                        <div class="archive-level" onclick="app.playLevel(${level.id})">
+                            <span class="level-name">Level ${level.id}</span>
+                            <span class="level-time">${timeStr}</span>
+                            <span class="level-status">${completed ? '✓' : ''}</span>
+                        </div>
+                    `;
+                }).join('');
+            },
+
+            playLevel(id) {
+                const level = this.LEVELS.find(l => l.id === id);
+                if (!level) return;
+
+                this.currentMode = 'archive';
+                this.currentLevelId = id;
+                this.grid = this.decodeGrid(level.grid);
+                this.initialGrid = this.decodeGrid(level.grid);
+                this.solution = this.decodeGrid(level.solution);
+                this.selectedCell = null;
+                this.notes = {};
+                this.history = [];
+                this.timer = 0;
+                this.isRunning = true;
+                this.currentHint = null;
+                this.highlightedCells = [];
+
+                this.closeArchive();
+                this.startTimer();
+                this.render();
+                this.hideMessage();
+                document.getElementById('newGameBtn').classList.remove('show');
+
+                // Update header to show level
+                document.querySelector('.top-bar h1').textContent = `Level ${id}`;
+            },
+
+            backToArchive() {
+                this.currentMode = 'random';
+                this.currentLevelId = null;
+                document.querySelector('.top-bar h1').textContent = 'Mini Sudoku';
+                document.getElementById('newGameBtn').classList.remove('show');
+                this.hideMessage();
+                this.openArchive();
             },
 
             trackGameComplete(difficulty, time) {
@@ -1527,14 +1753,26 @@
                 return null;
             },
 
+            handleNewGame() {
+                if (this.currentMode === 'archive') {
+                    this.backToArchive();
+                } else {
+                    this.newPuzzle();
+                }
+            },
+
             newPuzzle() {
+                this.currentMode = 'random';
+                this.currentLevelId = null;
+                document.querySelector('.top-bar h1').textContent = 'Mini Sudoku';
+
                 const { puzzle, solution } = this.generatePuzzle(this.difficulty);
 
                 // Verify the puzzle is valid
                 console.log('Generated puzzle:', puzzle);
                 console.log('Solution:', solution);
                 console.log('Difficulty:', this.difficulty);
-                
+
                 this.grid = puzzle.map(row => [...row]);
                 this.initialGrid = puzzle.map(row => [...row]);
                 this.solution = solution;
@@ -1908,22 +2146,54 @@
                     );
                     if (isCorrect) {
                         this.isRunning = false;
-                        this.trackGameComplete(this.difficulty, this.timer);
-
                         const timeStr = this.formatTime(this.timer);
-                        const avg = this.getAverageTime(this.difficulty);
-                        let message = `🎉 Solved in ${timeStr}!`;
-                        if (avg) {
-                            const diff = this.timer - avg;
-                            const diffStr = this.formatTime(Math.abs(diff));
-                            if (diff < 0) {
-                                message += ` (${diffStr} faster than avg)`;
-                            } else if (diff > 0) {
-                                message += ` (${diffStr} slower than avg)`;
+
+                        if (this.currentMode === 'archive') {
+                            // Archive mode completion
+                            const progress = this.archiveProgress[this.currentLevelId];
+                            const isNewRecord = !progress || !progress.bestTime || this.timer < progress.bestTime;
+
+                            if (isNewRecord) {
+                                this.archiveProgress[this.currentLevelId] = {
+                                    bestTime: this.timer,
+                                    completedAt: new Date().toISOString()
+                                };
+                                this.saveArchiveProgress();
                             }
+
+                            let message = `🎉 Solved in ${timeStr}!`;
+                            if (isNewRecord && progress && progress.bestTime) {
+                                message += ' New Record!';
+                            }
+                            this.showMessage(message, 'success');
+
+                            // Update button text for archive mode
+                            const btn = document.getElementById('newGameBtn');
+                            btn.textContent = 'Back to Levels';
+                            btn.onclick = () => this.backToArchive();
+                            btn.classList.add('show');
+                        } else {
+                            // Random mode completion
+                            this.trackGameComplete(this.difficulty, this.timer);
+
+                            const avg = this.getAverageTime(this.difficulty);
+                            let message = `🎉 Solved in ${timeStr}!`;
+                            if (avg) {
+                                const diff = this.timer - avg;
+                                const diffStr = this.formatTime(Math.abs(diff));
+                                if (diff < 0) {
+                                    message += ` (${diffStr} faster than avg)`;
+                                } else if (diff > 0) {
+                                    message += ` (${diffStr} slower than avg)`;
+                                }
+                            }
+                            this.showMessage(message, 'success');
+
+                            const btn = document.getElementById('newGameBtn');
+                            btn.textContent = 'New Game';
+                            btn.onclick = () => this.newPuzzle();
+                            btn.classList.add('show');
                         }
-                        this.showMessage(message, 'success');
-                        document.getElementById('newGameBtn').classList.add('show');
                     } else {
                         this.showMessage('Some cells are incorrect!', 'error');
                         setTimeout(() => this.hideMessage(), 3000);

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puzzle Creator - Mini Sudoku</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f3f2ef;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            max-width: 400px;
+            width: 100%;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0;
+            border: 2px solid #444;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #444;
+            margin-bottom: 16px;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 0.5px solid #ccc;
+            user-select: none;
+        }
+
+        .cell:hover {
+            background: #f0f0f0;
+        }
+
+        .cell.selected {
+            background: #e8f0fe;
+            box-shadow: inset 0 0 0 2px #1a73e8;
+        }
+
+        .cell.filled {
+            color: #000;
+        }
+
+        /* 2x3 block borders */
+        .cell:nth-child(3),
+        .cell:nth-child(9),
+        .cell:nth-child(15),
+        .cell:nth-child(21),
+        .cell:nth-child(27),
+        .cell:nth-child(33) {
+            border-right: 2px solid #444;
+        }
+
+        .cell:nth-child(7),
+        .cell:nth-child(8),
+        .cell:nth-child(9),
+        .cell:nth-child(10),
+        .cell:nth-child(11),
+        .cell:nth-child(12) {
+            border-bottom: 2px solid #444;
+        }
+
+        .cell:nth-child(19),
+        .cell:nth-child(20),
+        .cell:nth-child(21),
+        .cell:nth-child(22),
+        .cell:nth-child(23),
+        .cell:nth-child(24) {
+            border-bottom: 2px solid #444;
+        }
+
+        .number-pad {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .num-btn {
+            padding: 12px;
+            font-size: 18px;
+            font-weight: 500;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .num-btn:hover {
+            background: #f5f5f5;
+        }
+
+        .num-btn:active {
+            background: #e0e0e0;
+        }
+
+        .num-btn.clear {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .action-btn.secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .action-btn.primary {
+            background: #1a73e8;
+            color: white;
+        }
+
+        .action-btn:hover {
+            opacity: 0.9;
+        }
+
+        .output-section {
+            margin-top: 16px;
+        }
+
+        .output-section label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .level-input {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .level-input input {
+            width: 80px;
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .output {
+            width: 100%;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #f8f8f8;
+            word-break: break-all;
+            min-height: 60px;
+        }
+
+        .copy-btn {
+            margin-top: 8px;
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            background: #10b981;
+            color: white;
+            cursor: pointer;
+        }
+
+        .copy-btn:hover {
+            background: #059669;
+        }
+
+        .message {
+            margin-top: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .message.info {
+            background: #e8f4fd;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Puzzle Creator</h1>
+
+        <div class="grid" id="grid"></div>
+
+        <div class="number-pad">
+            <button class="num-btn" onclick="creator.inputNumber(1)">1</button>
+            <button class="num-btn" onclick="creator.inputNumber(2)">2</button>
+            <button class="num-btn" onclick="creator.inputNumber(3)">3</button>
+            <button class="num-btn" onclick="creator.inputNumber(4)">4</button>
+            <button class="num-btn" onclick="creator.inputNumber(5)">5</button>
+            <button class="num-btn" onclick="creator.inputNumber(6)">6</button>
+            <button class="num-btn clear" onclick="creator.clearCell()">Clear</button>
+        </div>
+
+        <div class="actions">
+            <button class="action-btn secondary" onclick="creator.clearAll()">Clear All</button>
+            <button class="action-btn primary" onclick="creator.solve()">Solve</button>
+        </div>
+
+        <div class="output-section">
+            <label>Level Number</label>
+            <div class="level-input">
+                <input type="number" id="levelNum" value="1" min="1">
+            </div>
+
+            <label>CSV Output</label>
+            <div class="output" id="output">Enter a puzzle and click "Solve" to generate output</div>
+            <button class="copy-btn" onclick="creator.copyOutput()">Copy to Clipboard</button>
+            <div id="message"></div>
+        </div>
+    </div>
+
+    <script>
+        const creator = {
+            grid: Array(6).fill(null).map(() => Array(6).fill(0)),
+            solution: null,
+            selectedCell: null,
+
+            init() {
+                this.render();
+                document.addEventListener('keydown', (e) => {
+                    if (e.key >= '1' && e.key <= '6') {
+                        this.inputNumber(parseInt(e.key));
+                    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                        e.preventDefault();
+                        this.clearCell();
+                    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        this.navigate(e.key);
+                    }
+                });
+            },
+
+            navigate(key) {
+                if (!this.selectedCell) {
+                    this.selectCell(0, 0);
+                    return;
+                }
+                let [row, col] = this.selectedCell;
+                if (key === 'ArrowUp') row = Math.max(0, row - 1);
+                else if (key === 'ArrowDown') row = Math.min(5, row + 1);
+                else if (key === 'ArrowLeft') col = Math.max(0, col - 1);
+                else if (key === 'ArrowRight') col = Math.min(5, col + 1);
+                this.selectCell(row, col);
+            },
+
+            selectCell(row, col) {
+                this.selectedCell = [row, col];
+                this.render();
+            },
+
+            inputNumber(num) {
+                if (!this.selectedCell) return;
+                const [row, col] = this.selectedCell;
+                this.grid[row][col] = num;
+                this.solution = null; // Reset solution when grid changes
+                this.render();
+                this.updateOutput();
+            },
+
+            clearCell() {
+                if (!this.selectedCell) return;
+                const [row, col] = this.selectedCell;
+                this.grid[row][col] = 0;
+                this.solution = null;
+                this.render();
+                this.updateOutput();
+            },
+
+            clearAll() {
+                this.grid = Array(6).fill(null).map(() => Array(6).fill(0));
+                this.solution = null;
+                this.selectedCell = null;
+                this.render();
+                this.updateOutput();
+            },
+
+            isValid(grid, row, col, num) {
+                for (let x = 0; x < 6; x++) {
+                    if (grid[row][x] === num) return false;
+                    if (grid[x][col] === num) return false;
+                }
+                const boxRow = Math.floor(row / 2) * 2;
+                const boxCol = Math.floor(col / 3) * 3;
+                for (let i = 0; i < 2; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        if (grid[boxRow + i][boxCol + j] === num) return false;
+                    }
+                }
+                return true;
+            },
+
+            solvePuzzle(grid) {
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (grid[row][col] === 0) {
+                            for (let num = 1; num <= 6; num++) {
+                                if (this.isValid(grid, row, col, num)) {
+                                    grid[row][col] = num;
+                                    if (this.solvePuzzle(grid)) return true;
+                                    grid[row][col] = 0;
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            },
+
+            solve() {
+                // Check if puzzle has any numbers
+                const hasNumbers = this.grid.some(row => row.some(cell => cell !== 0));
+                if (!hasNumbers) {
+                    this.showMessage('Enter some numbers first', 'error');
+                    return;
+                }
+
+                // Try to solve
+                const gridCopy = this.grid.map(row => [...row]);
+                if (this.solvePuzzle(gridCopy)) {
+                    this.solution = gridCopy;
+                    this.updateOutput();
+                    this.showMessage('Puzzle solved! CSV ready to copy.', 'success');
+                } else {
+                    this.solution = null;
+                    this.showMessage('No solution found - check your puzzle', 'error');
+                }
+            },
+
+            encodeGrid(grid) {
+                return grid.map(row => row.join('')).join('');
+            },
+
+            updateOutput() {
+                const output = document.getElementById('output');
+                if (!this.solution) {
+                    output.textContent = 'Enter a puzzle and click "Solve" to generate output';
+                    return;
+                }
+
+                const level = document.getElementById('levelNum').value || '1';
+                const gridStr = this.encodeGrid(this.grid);
+                const solutionStr = this.encodeGrid(this.solution);
+                output.textContent = `${level},${gridStr},${solutionStr}`;
+            },
+
+            copyOutput() {
+                const output = document.getElementById('output').textContent;
+                if (output.includes('Enter a puzzle')) {
+                    this.showMessage('Solve the puzzle first', 'error');
+                    return;
+                }
+                navigator.clipboard.writeText(output).then(() => {
+                    this.showMessage('Copied to clipboard!', 'success');
+                }).catch(() => {
+                    this.showMessage('Failed to copy', 'error');
+                });
+            },
+
+            showMessage(text, type) {
+                const msg = document.getElementById('message');
+                msg.textContent = text;
+                msg.className = `message ${type}`;
+                setTimeout(() => {
+                    msg.textContent = '';
+                    msg.className = '';
+                }, 3000);
+            },
+
+            render() {
+                const gridEl = document.getElementById('grid');
+                gridEl.innerHTML = '';
+
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+
+                        const isSelected = this.selectedCell &&
+                            this.selectedCell[0] === row &&
+                            this.selectedCell[1] === col;
+
+                        if (isSelected) cell.classList.add('selected');
+                        if (this.grid[row][col] !== 0) {
+                            cell.classList.add('filled');
+                            cell.textContent = this.grid[row][col];
+                        }
+
+                        cell.onclick = () => this.selectCell(row, col);
+                        gridEl.appendChild(cell);
+                    }
+                }
+            }
+        };
+
+        window.onload = () => creator.init();
+    </script>
+</body>
+</html>

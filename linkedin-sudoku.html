@@ -900,11 +900,12 @@
             },
 
             newPuzzle() {
-                const { puzzle, solution } = this.generatePuzzle('medium');
+                const { puzzle, solution } = this.generatePuzzle(this.difficulty);
                 
                 // Verify the puzzle is valid
                 console.log('Generated puzzle:', puzzle);
                 console.log('Solution:', solution);
+                console.log('Difficulty:', this.difficulty);
                 
                 this.grid = puzzle.map(row => [...row]);
                 this.initialGrid = puzzle.map(row => [...row]);
@@ -919,6 +920,34 @@
                 this.startTimer();
                 this.render();
                 this.hideMessage();
+                
+                // Update difficulty display
+                document.getElementById('difficulty').textContent = this.difficulty.charAt(0).toUpperCase() + this.difficulty.slice(1);
+            },
+
+            changeDifficulty(newDifficulty) {
+                this.difficulty = newDifficulty;
+                
+                // Update button states
+                const difficultyButtons = {
+                    easy: document.querySelector('[onclick="app.changeDifficulty(\'easy\')"]'),
+                    medium: document.querySelector('[onclick="app.changeDifficulty(\'medium\')"]'),
+                    hard: document.querySelector('[onclick="app.changeDifficulty(\'hard\')"]'),
+                    expert: document.querySelector('[onclick="app.changeDifficulty(\'expert\')"]')
+                };
+                
+                Object.keys(difficultyButtons).forEach(diff => {
+                    if (difficultyButtons[diff]) {
+                        if (diff === newDifficulty) {
+                            difficultyButtons[diff].classList.add('active');
+                        } else {
+                            difficultyButtons[diff].classList.remove('active');
+                        }
+                    }
+                });
+                
+                // Generate new puzzle with new difficulty
+                this.newPuzzle();
             },
 
             startTimer() {

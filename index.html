@@ -207,8 +207,18 @@
             100% { background: white; transform: scale(1); }
         }
 
-        .cell.error {
-            background: #fee !important;
+        .cell.conflict {
+            background: repeating-linear-gradient(
+                45deg,
+                #fff,
+                #fff 4px,
+                #ffcccc 4px,
+                #ffcccc 8px
+            ) !important;
+            color: #c00 !important;
+        }
+
+        .cell.conflict.given {
             color: #c00 !important;
         }
 
@@ -2251,6 +2261,35 @@
                 localStorage.setItem('installBannerDismissed', 'true');
             },
 
+            // Check if a cell has a conflict (duplicate in row, column, or box)
+            hasConflict(row, col) {
+                const num = this.grid[row][col];
+                if (num === 0) return false;
+
+                // Check row for duplicates
+                for (let c = 0; c < 6; c++) {
+                    if (c !== col && this.grid[row][c] === num) return true;
+                }
+
+                // Check column for duplicates
+                for (let r = 0; r < 6; r++) {
+                    if (r !== row && this.grid[r][col] === num) return true;
+                }
+
+                // Check 2x3 box for duplicates
+                const boxRow = Math.floor(row / 2) * 2;
+                const boxCol = Math.floor(col / 3) * 3;
+                for (let i = 0; i < 2; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        const r = boxRow + i;
+                        const c = boxCol + j;
+                        if ((r !== row || c !== col) && this.grid[r][c] === num) return true;
+                    }
+                }
+
+                return false;
+            },
+
             render() {
                 const gridEl = document.getElementById('grid');
                 gridEl.innerHTML = '';
@@ -2259,19 +2298,21 @@
                     for (let col = 0; col < 6; col++) {
                         const cell = document.createElement('div');
                         cell.className = 'cell';
-                        
+
                         const isGiven = this.initialGrid[row][col] !== 0;
                         const isSelected = this.selectedCell && this.selectedCell[0] === row && this.selectedCell[1] === col;
                         const isHighlighted = this.highlightedCells.some(([r, c]) => r === row && c === col);
-                        
+                        const isConflict = this.hasConflict(row, col);
+
                         if (isGiven) cell.classList.add('given');
                         if (isSelected) cell.classList.add('selected');
                         if (isHighlighted) cell.classList.add('highlighted');
                         if (!isGiven && this.grid[row][col] !== 0) cell.classList.add('user-input');
+                        if (isConflict) cell.classList.add('conflict');
 
                         const key = `${row}-${col}`;
                         const cellNotes = this.notes[key] || [];
-                        
+
                         if (cellNotes.length > 0 && this.grid[row][col] === 0) {
                             const notesDiv = document.createElement('div');
                             notesDiv.className = 'notes';

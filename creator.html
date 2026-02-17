@@ -268,7 +268,7 @@
                 <input type="number" id="levelNum" value="1" min="1">
             </div>
 
-            <label>CSV Output</label>
+            <label>JS Object Output</label>
             <div class="output" id="output">Enter a puzzle and click "Solve" to generate output</div>
             <button class="copy-btn" onclick="creator.copyOutput()">Copy to Clipboard</button>
             <div id="message"></div>
@@ -284,6 +284,9 @@
             init() {
                 this.render();
                 document.addEventListener('keydown', (e) => {
+                    // Ignore if typing in an input field
+                    if (document.activeElement.tagName === 'INPUT') return;
+
                     if (e.key >= '1' && e.key <= '6') {
                         this.inputNumber(parseInt(e.key));
                     } else if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -292,6 +295,14 @@
                     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                         e.preventDefault();
                         this.navigate(e.key);
+                    }
+                });
+
+                // Auto-update and copy when level number changes
+                document.getElementById('levelNum').addEventListener('input', () => {
+                    this.updateOutput();
+                    if (this.solution) {
+                        this.copyOutput();
                     }
                 });
             },
@@ -373,6 +384,34 @@
                 return true;
             },
 
+            // Count solutions (stops at 2 since we only need to know if unique)
+            countSolutions(grid, count = { value: 0 }) {
+                if (count.value >= 2) return count.value; // Early exit if multiple found
+
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (grid[row][col] === 0) {
+                            for (let num = 1; num <= 6; num++) {
+                                if (this.isValid(grid, row, col, num)) {
+                                    grid[row][col] = num;
+                                    this.countSolutions(grid, count);
+                                    grid[row][col] = 0;
+                                    if (count.value >= 2) return count.value;
+                                }
+                            }
+                            return count.value;
+                        }
+                    }
+                }
+                count.value++;
+                return count.value;
+            },
+
+            hasUniqueSolution(grid) {
+                const gridCopy = grid.map(row => [...row]);
+                return this.countSolutions(gridCopy) === 1;
+            },
+
             solve() {
                 // Check if puzzle has any numbers
                 const hasNumbers = this.grid.some(row => row.some(cell => cell !== 0));
@@ -381,16 +420,27 @@
                     return;
                 }
 
-                // Try to solve
-                const gridCopy = this.grid.map(row => [...row]);
-                if (this.solvePuzzle(gridCopy)) {
-                    this.solution = gridCopy;
-                    this.updateOutput();
-                    this.showMessage('Puzzle solved! CSV ready to copy.', 'success');
-                } else {
+                // Check for unique solution
+                const solutionCount = this.countSolutions(this.grid.map(row => [...row]));
+
+                if (solutionCount === 0) {
                     this.solution = null;
                     this.showMessage('No solution found - check your puzzle', 'error');
+                    return;
                 }
+
+                if (solutionCount >= 2) {
+                    this.solution = null;
+                    this.showMessage('Multiple solutions found - add more clues', 'error');
+                    return;
+                }
+
+                // Unique solution - get it
+                const gridCopy = this.grid.map(row => [...row]);
+                this.solvePuzzle(gridCopy);
+                this.solution = gridCopy;
+                this.updateOutput();
+                this.copyOutput();
             },
 
             encodeGrid(grid) {
@@ -407,7 +457,7 @@
                 const level = document.getElementById('levelNum').value || '1';
                 const gridStr = this.encodeGrid(this.grid);
                 const solutionStr = this.encodeGrid(this.solution);
-                output.textContent = `${level},${gridStr},${solutionStr}`;
+                output.textContent = `{ id: ${level}, grid: "${gridStr}", solution: "${solutionStr}" },`;
             },
 
             copyOutput() {

@@ -297,6 +297,14 @@
                         this.navigate(e.key);
                     }
                 });
+
+                // Auto-update and copy when level number changes
+                document.getElementById('levelNum').addEventListener('input', () => {
+                    this.updateOutput();
+                    if (this.solution) {
+                        this.copyOutput();
+                    }
+                });
             },
 
             navigate(key) {
@@ -432,7 +440,7 @@
                 this.solvePuzzle(gridCopy);
                 this.solution = gridCopy;
                 this.updateOutput();
-                this.showMessage('Unique solution found! Ready to copy.', 'success');
+                this.copyOutput();
             },
 
             encodeGrid(grid) {

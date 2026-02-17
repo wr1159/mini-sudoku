@@ -760,6 +760,7 @@
                     <button class="option-btn" data-value="medium" onclick="app.filterStats('medium')">Medium</button>
                     <button class="option-btn" data-value="hard" onclick="app.filterStats('hard')">Hard</button>
                     <button class="option-btn" data-value="expert" onclick="app.filterStats('expert')">Expert</button>
+                    <button class="option-btn" data-value="ultra" onclick="app.filterStats('ultra')">Ultra</button>
                 </div>
             </div>
 
@@ -987,6 +988,8 @@
             init() {
                 this.loadStats();
                 this.loadArchiveProgress();
+                const savedDifficulty = localStorage.getItem('sudokuDifficulty');
+                if (savedDifficulty) this.difficulty = savedDifficulty;
                 this.initSettingsListeners();
                 this.newPuzzle();
             },
@@ -2023,6 +2026,7 @@
 
             changeDifficulty(newDifficulty) {
                 this.difficulty = newDifficulty;
+                localStorage.setItem('sudokuDifficulty', newDifficulty);
                 this.updateSettingsUI();
             },
 

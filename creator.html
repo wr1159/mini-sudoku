@@ -287,6 +287,21 @@
                     // Ignore if typing in an input field
                     if (document.activeElement.tagName === 'INPUT') return;
 
+                    // Keyboard shortcuts:
+                    // - Cmd/Ctrl+S: "Save" (copy current output)
+                    // - Cmd/Ctrl+K: Clear all cells
+                    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+                        e.preventDefault();
+                        this.solve()
+                        this.copyOutput();
+                        return;
+                    }
+                    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                        e.preventDefault();
+                        this.clearAll();
+                        return;
+                    }
+
                     if (e.key >= '1' && e.key <= '6') {
                         this.inputNumber(parseInt(e.key));
                     } else if (e.key === 'Backspace' || e.key === 'Delete') {

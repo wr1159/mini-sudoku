@@ -817,6 +817,25 @@
         </div>
     </div>
 
+    <!-- Solve Stats Modal -->
+    <div class="modal-overlay" id="solveStatsModal" onclick="app.closeSolveStatsOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width: 360px;">
+            <h2>Puzzle Complete</h2>
+            <div class="modal-section">
+                <div id="solveStatsSummary" class="chart-summary"></div>
+            </div>
+            <div class="modal-section">
+                <label>Speed Over Time</label>
+                <div class="stats-chart">
+                    <svg id="solveChartSvg" viewBox="0 0 320 160"></svg>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn primary" onclick="app.closeSolveStats()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const app = {
             grid: [],
@@ -832,6 +851,7 @@
             currentHint: null,
             highlightedCells: [],
             history: [], // For undo functionality
+            solveAttempts: [],   // [{ t: seconds, correct: bool }, ...]
             difficulty: 'medium',
 
             // Stats tracking
@@ -976,6 +996,7 @@
                 this.selectedCell = null;
                 this.notes = {};
                 this.history = [];
+                this.solveAttempts = [];
                 this.timer = 0;
                 this.isRunning = true;
                 this.currentHint = null;
@@ -1043,6 +1064,101 @@
                 if (event.target === event.currentTarget) {
                     this.closeStats();
                 }
+            },
+
+            openSolveStats() {
+                this.renderSolveStatsChart();
+                document.getElementById('solveStatsModal').classList.add('show');
+            },
+
+            closeSolveStats() {
+                document.getElementById('solveStatsModal').classList.remove('show');
+            },
+
+            closeSolveStatsOnOverlay(event) {
+                if (event.target === event.currentTarget) this.closeSolveStats();
+            },
+
+            renderSolveStatsChart() {
+                const attempts = this.solveAttempts;
+                const svg = document.getElementById('solveChartSvg');
+                const summary = document.getElementById('solveStatsSummary');
+
+                const totalInputs = attempts.length;
+                const correctInputs = attempts.filter(a => a.correct).length;
+                const accuracy = totalInputs > 0 ? Math.round((correctInputs / totalInputs) * 100) : 0;
+                const cspm = this.timer > 0 ? Math.round((correctInputs / this.timer) * 60 * 10) / 10 : 0;
+
+                summary.innerHTML = `
+                    <div class="stat">
+                        <div class="stat-value">${this.formatTime(this.timer)}</div>
+                        <div class="stat-label">Solve Time</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${accuracy}%</div>
+                        <div class="stat-label">Accuracy</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${cspm}</div>
+                        <div class="stat-label">CSPM</div>
+                    </div>`;
+
+                if (attempts.length === 0) {
+                    svg.innerHTML = '<text x="160" y="85" text-anchor="middle" fill="#999" font-size="13">No inputs recorded</text>';
+                    return;
+                }
+
+                // Compute rolling CSPM at each attempt
+                const points = [];
+                let correctSoFar = 0;
+                attempts.forEach(a => {
+                    if (a.correct) correctSoFar++;
+                    const rollingCspm = a.t > 0 ? (correctSoFar / a.t) * 60 : (a.correct ? 60 : 0);
+                    points.push({ t: a.t, cspm: rollingCspm, correct: a.correct });
+                });
+
+                // Chart dimensions
+                const width = 320, height = 160;
+                const pad = { top: 20, right: 20, bottom: 30, left: 45 };
+                const cw = width - pad.left - pad.right;
+                const ch = height - pad.top - pad.bottom;
+
+                const maxT = Math.max(...points.map(p => p.t), 1);
+                const maxC = Math.max(...points.map(p => p.cspm), 1);
+                const xScale = t => pad.left + (t / maxT) * cw;
+                const yScale = c => pad.top + ch - (c / (maxC * 1.1)) * ch;
+
+                let svgContent = '';
+
+                // Grid lines + Y labels
+                for (let i = 0; i <= 4; i++) {
+                    const val = (maxC * 1.1) * (i / 4);
+                    const y = yScale(val);
+                    svgContent += `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="#e0e0e0" stroke-width="1"/>`;
+                    svgContent += `<text x="${pad.left - 5}" y="${y + 4}" text-anchor="end" fill="#999" font-size="10">${Math.round(val)}</text>`;
+                }
+
+                // X-axis
+                svgContent += `<line x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" stroke="#ccc" stroke-width="1"/>`;
+                svgContent += `<text x="${width / 2}" y="${height - 8}" text-anchor="middle" fill="#999" font-size="10">Time (seconds)</text>`;
+                svgContent += `<text x="${pad.left - 38}" y="${pad.top + ch / 2}" text-anchor="middle" fill="#999" font-size="10" transform="rotate(-90,${pad.left - 38},${pad.top + ch / 2})">CSPM</text>`;
+
+                // Line path
+                if (points.length > 1) {
+                    let d = `M ${xScale(points[0].t)} ${yScale(points[0].cspm)}`;
+                    for (let i = 1; i < points.length; i++) {
+                        d += ` L ${xScale(points[i].t)} ${yScale(points[i].cspm)}`;
+                    }
+                    svgContent += `<path d="${d}" fill="none" stroke="#1a73e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+                }
+
+                // Dots: green = correct, red = incorrect
+                points.forEach(p => {
+                    const color = p.correct ? '#10b981' : '#ef4444';
+                    svgContent += `<circle cx="${xScale(p.t)}" cy="${yScale(p.cspm)}" r="4" fill="${color}" stroke="white" stroke-width="1.5"/>`;
+                });
+
+                svg.innerHTML = svgContent;
             },
 
             resetStats() {
@@ -1783,6 +1899,7 @@
                 this.selectedCell = null;
                 this.notes = {};
                 this.history = [];
+                this.solveAttempts = [];
                 this.timer = 0;
                 this.isRunning = true;
                 this.currentHint = null;
@@ -2020,6 +2137,7 @@
                     });
 
                     this.grid[row][col] = num;
+                    this.solveAttempts.push({ t: this.timer, correct: num === this.solution[row][col] });
                     delete this.notes[`${row}-${col}`];
                     this.render();
                     
@@ -2150,6 +2268,7 @@
                     );
                     if (isCorrect) {
                         this.isRunning = false;
+                        this.openSolveStats();
                         const timeStr = this.formatTime(this.timer);
 
                         if (this.currentMode === 'archive') {
@@ -2305,11 +2424,13 @@
                 if (e.key === 'Escape') {
                     app.closeSettings();
                     app.closeStats();
+                    app.closeSolveStats();
                     return;
                 }
                 // Don't handle other keys if modal is open
                 if (document.getElementById('settingsModal').classList.contains('show') ||
-                    document.getElementById('statsModal').classList.contains('show')) {
+                    document.getElementById('statsModal').classList.contains('show') ||
+                    document.getElementById('solveStatsModal').classList.contains('show')) {
                     return;
                 }
                 // Number keys 1-6

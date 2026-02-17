@@ -268,7 +268,7 @@
                 <input type="number" id="levelNum" value="1" min="1">
             </div>
 
-            <label>CSV Output</label>
+            <label>JS Object Output</label>
             <div class="output" id="output">Enter a puzzle and click "Solve" to generate output</div>
             <button class="copy-btn" onclick="creator.copyOutput()">Copy to Clipboard</button>
             <div id="message"></div>
@@ -284,6 +284,9 @@
             init() {
                 this.render();
                 document.addEventListener('keydown', (e) => {
+                    // Ignore if typing in an input field
+                    if (document.activeElement.tagName === 'INPUT') return;
+
                     if (e.key >= '1' && e.key <= '6') {
                         this.inputNumber(parseInt(e.key));
                     } else if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -429,7 +432,7 @@
                 this.solvePuzzle(gridCopy);
                 this.solution = gridCopy;
                 this.updateOutput();
-                this.showMessage('Unique solution found! CSV ready to copy.', 'success');
+                this.showMessage('Unique solution found! Ready to copy.', 'success');
             },
 
             encodeGrid(grid) {
@@ -446,7 +449,7 @@
                 const level = document.getElementById('levelNum').value || '1';
                 const gridStr = this.encodeGrid(this.grid);
                 const solutionStr = this.encodeGrid(this.solution);
-                output.textContent = `${level},${gridStr},${solutionStr}`;
+                output.textContent = `{ id: ${level}, grid: "${gridStr}", solution: "${solutionStr}" },`;
             },
 
             copyOutput() {

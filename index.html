@@ -781,6 +781,7 @@
                     <button class="option-btn" data-value="medium" onclick="app.filterStats('medium')">Medium</button>
                     <button class="option-btn" data-value="hard" onclick="app.filterStats('hard')">Hard</button>
                     <button class="option-btn" data-value="expert" onclick="app.filterStats('expert')">Expert</button>
+                    <button class="option-btn" data-value="ultra" onclick="app.filterStats('ultra')">Ultra</button>
                 </div>
             </div>
 
@@ -1035,6 +1036,8 @@
                 this.loadStats();
                 this.loadTactics();
                 this.loadArchiveProgress();
+                const savedDifficulty = localStorage.getItem('sudokuDifficulty');
+                if (savedDifficulty) this.difficulty = savedDifficulty;
                 this.initSettingsListeners();
                 this.newPuzzle();
             },
@@ -1180,12 +1183,13 @@
                 this.openArchive();
             },
 
-            trackGameComplete(difficulty, time) {
+            trackGameComplete(difficulty, time, cspm) {
                 if (!this.stats.gamesByDifficulty[difficulty]) {
                     this.stats.gamesByDifficulty[difficulty] = [];
                 }
                 this.stats.gamesByDifficulty[difficulty].push({
                     time,
+                    cspm,
                     date: new Date().toISOString()
                 });
                 // Keep only last 50 games per difficulty
@@ -1426,6 +1430,12 @@
                 const bestTime = Math.min(...times);
                 const latestTime = times[times.length - 1];
 
+                // Average CSPM for the filtered games
+                const gamesWithCspm = games.filter(g => g.cspm != null);
+                const avgCspm = gamesWithCspm.length > 0
+                    ? Math.round(gamesWithCspm.reduce((s, g) => s + g.cspm, 0) / gamesWithCspm.length * 10) / 10
+                    : 0;
+
                 summary.innerHTML = `
                     <div class="stat">
                         <div class="stat-value">${this.formatTime(bestTime)}</div>
@@ -1442,6 +1452,10 @@
                     <div class="stat">
                         <div class="stat-value">${games.length}</div>
                         <div class="stat-label">Games</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${avgCspm}</div>
+                        <div class="stat-label">Avg CSPM</div>
                     </div>
                 `;
             },
@@ -2056,6 +2070,7 @@
 
             changeDifficulty(newDifficulty) {
                 this.difficulty = newDifficulty;
+                localStorage.setItem('sudokuDifficulty', newDifficulty);
                 this.updateSettingsUI();
             },
 
@@ -2454,7 +2469,9 @@
                             btn.classList.add('show');
                         } else {
                             // Random mode completion
-                            this.trackGameComplete(this.difficulty, this.timer);
+                            const correctInputs = this.solveAttempts.filter(a => a.correct).length;
+                            const cspm = this.timer > 0 ? Math.round((correctInputs / this.timer) * 60 * 10) / 10 : 0;
+                            this.trackGameComplete(this.difficulty, this.timer, cspm);
 
                             const avg = this.getAverageTime(this.difficulty);
                             let message = `🎉 Solved in ${timeStr}!`;

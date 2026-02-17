@@ -1120,12 +1120,13 @@
                 this.openArchive();
             },
 
-            trackGameComplete(difficulty, time) {
+            trackGameComplete(difficulty, time, cspm) {
                 if (!this.stats.gamesByDifficulty[difficulty]) {
                     this.stats.gamesByDifficulty[difficulty] = [];
                 }
                 this.stats.gamesByDifficulty[difficulty].push({
                     time,
+                    cspm,
                     date: new Date().toISOString()
                 });
                 // Keep only last 50 games per difficulty
@@ -1366,6 +1367,15 @@
                 const bestTime = Math.min(...times);
                 const latestTime = times[times.length - 1];
 
+                // Average CSPM per difficulty for the filtered set
+                const difficulties = ['easy', 'medium', 'hard', 'expert', 'ultra'];
+                const cspmRows = difficulties.map(diff => {
+                    const diffGames = (this.stats.gamesByDifficulty[diff] || []).filter(g => g.cspm != null);
+                    if (diffGames.length === 0) return '';
+                    const avg = Math.round(diffGames.reduce((s, g) => s + g.cspm, 0) / diffGames.length * 10) / 10;
+                    return `<div class="stat"><div class="stat-value">${avg}</div><div class="stat-label">${diff}</div></div>`;
+                }).join('');
+
                 summary.innerHTML = `
                     <div class="stat">
                         <div class="stat-value">${this.formatTime(bestTime)}</div>
@@ -1383,6 +1393,7 @@
                         <div class="stat-value">${games.length}</div>
                         <div class="stat-label">Games</div>
                     </div>
+                    ${cspmRows ? `<div style="width:100%;margin-top:10px;border-top:1px solid #eee;padding-top:8px;"><div style="font-size:10px;text-transform:uppercase;color:#999;margin-bottom:6px;">Avg CSPM by Difficulty</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${cspmRows}</div></div>` : ''}
                 `;
             },
 
@@ -2396,7 +2407,9 @@
                             btn.classList.add('show');
                         } else {
                             // Random mode completion
-                            this.trackGameComplete(this.difficulty, this.timer);
+                            const correctInputs = this.solveAttempts.filter(a => a.correct).length;
+                            const cspm = this.timer > 0 ? Math.round((correctInputs / this.timer) * 60 * 10) / 10 : 0;
+                            this.trackGameComplete(this.difficulty, this.timer, cspm);
 
                             const avg = this.getAverageTime(this.difficulty);
                             let message = `🎉 Solved in ${timeStr}!`;

@@ -439,6 +439,27 @@
             color: #1a73e8;
         }
 
+        .tactics-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .tactic-btn {
+            padding: 4px 10px;
+            border: 1.5px solid #ddd;
+            border-radius: 20px;
+            background: white;
+            font-size: 12px;
+            cursor: pointer;
+            color: #555;
+            transition: all 0.15s;
+        }
+        .tactic-btn.active {
+            background: #1a73e8;
+            border-color: #1a73e8;
+            color: white;
+        }
+
         .modal-actions {
             display: flex;
             gap: 8px;
@@ -804,6 +825,21 @@
             </div>
 
             <div class="modal-section">
+                <label>Hint Tactics <span style="font-weight:400;font-size:11px;color:#999;">— disable to practice yourself</span></label>
+                <div id="tacticsOptions" class="tactics-grid">
+                    <button class="tactic-btn" data-tactic="nakedSingle">Naked Single</button>
+                    <button class="tactic-btn" data-tactic="hiddenSingle">Hidden Single</button>
+                    <button class="tactic-btn" data-tactic="nakedPair">Naked Pair</button>
+                    <button class="tactic-btn" data-tactic="pointingPair">Pointing Pair</button>
+                    <button class="tactic-btn" data-tactic="boxLineReduction">Box-Line</button>
+                    <button class="tactic-btn" data-tactic="xWing">X-Wing</button>
+                    <button class="tactic-btn" data-tactic="yWing">Y-Wing</button>
+                    <button class="tactic-btn" data-tactic="bug">BUG</button>
+                    <button class="tactic-btn" data-tactic="swordfish">Swordfish</button>
+                </div>
+            </div>
+
+            <div class="modal-section">
                 <label>Timer</label>
                 <div class="option-group">
                     <button class="option-btn" id="timerToggleBtn" onclick="app.toggleTimer()">
@@ -863,6 +899,17 @@
             history: [], // For undo functionality
             solveAttempts: [],   // [{ t: seconds, correct: bool }, ...]
             difficulty: 'medium',
+            enabledTactics: {
+                nakedSingle: true,
+                hiddenSingle: true,
+                nakedPair: true,
+                pointingPair: true,
+                boxLineReduction: true,
+                xWing: true,
+                yWing: true,
+                bug: true,
+                swordfish: true,
+            },
 
             // Stats tracking
             stats: {
@@ -986,6 +1033,7 @@
 
             init() {
                 this.loadStats();
+                this.loadTactics();
                 this.loadArchiveProgress();
                 this.initSettingsListeners();
                 this.newPuzzle();
@@ -1012,6 +1060,18 @@
                 } catch (e) {
                     console.error('Failed to save stats:', e);
                 }
+            },
+
+            loadTactics() {
+                try {
+                    const saved = localStorage.getItem('sudokuTactics');
+                    if (saved) Object.assign(this.enabledTactics, JSON.parse(saved));
+                } catch (e) {}
+            },
+            saveTactics() {
+                try {
+                    localStorage.setItem('sudokuTactics', JSON.stringify(this.enabledTactics));
+                } catch (e) {}
             },
 
             // Archive functions
@@ -1605,44 +1665,28 @@
             },
 
             getSmartHint(grid) {
-                // Basic techniques (all difficulties)
-                let hint = this.findNakedSingle(grid);
-                if (hint) return hint;
+                const t = this.enabledTactics;
 
-                hint = this.findHiddenSingle(grid);
-                if (hint) return hint;
+                if (t.nakedSingle)  { const h = this.findNakedSingle(grid);  if (h) return h; }
+                if (t.hiddenSingle) { const h = this.findHiddenSingle(grid); if (h) return h; }
 
-                // Intermediate techniques (medium+)
                 if (this.difficulty !== 'easy') {
-                    hint = this.findNakedPair(grid);
-                    if (hint) return hint;
-
-                    hint = this.findPointingPair(grid);
-                    if (hint) return hint;
-
-                    hint = this.findBoxLineReduction(grid);
-                    if (hint) return hint;
+                    if (t.nakedPair)        { const h = this.findNakedPair(grid);        if (h) return h; }
+                    if (t.pointingPair)     { const h = this.findPointingPair(grid);     if (h) return h; }
+                    if (t.boxLineReduction) { const h = this.findBoxLineReduction(grid); if (h) return h; }
                 }
 
-                // Advanced techniques (hard+)
-                if (this.difficulty === 'hard' || this.difficulty === 'expert' || this.difficulty === 'ultra') {
-                    hint = this.findXWing(grid);
-                    if (hint) return hint;
+                if (['hard', 'expert', 'ultra'].includes(this.difficulty)) {
+                    if (t.xWing) { const h = this.findXWing(grid); if (h) return h; }
                 }
 
-                // Expert techniques
-                if (this.difficulty === 'expert' || this.difficulty === 'ultra') {
-                    hint = this.findYWing(grid);
-                    if (hint) return hint;
+                if (['expert', 'ultra'].includes(this.difficulty)) {
+                    if (t.yWing) { const h = this.findYWing(grid); if (h) return h; }
                 }
 
-                // Ultra expert techniques
                 if (this.difficulty === 'ultra') {
-                    hint = this.findBUG(grid);
-                    if (hint) return hint;
-
-                    hint = this.findSwordfish(grid);
-                    if (hint) return hint;
+                    if (t.bug)       { const h = this.findBUG(grid);       if (h) return h; }
+                    if (t.swordfish) { const h = this.findSwordfish(grid); if (h) return h; }
                 }
 
                 // Fallback
@@ -2015,6 +2059,12 @@
                 this.updateSettingsUI();
             },
 
+            toggleTactic(key) {
+                this.enabledTactics[key] = !this.enabledTactics[key];
+                this.saveTactics();
+                this.updateSettingsUI();
+            },
+
             // Settings Modal
             openSettings() {
                 this.updateSettingsUI();
@@ -2045,6 +2095,10 @@
                 document.querySelectorAll('#hintOptions .option-btn').forEach(btn => {
                     btn.classList.toggle('active', btn.dataset.value === this.hintLevel);
                 });
+                // Update tactic buttons
+                document.querySelectorAll('#tacticsOptions .tactic-btn').forEach(btn => {
+                    btn.classList.toggle('active', !!this.enabledTactics[btn.dataset.tactic]);
+                });
                 // Update timer button
                 this.updateTimerButton();
             },
@@ -2070,6 +2124,10 @@
                     btn.addEventListener('click', () => {
                         this.setHintLevel(btn.dataset.value);
                     });
+                });
+                // Tactic toggle buttons
+                document.querySelectorAll('#tacticsOptions .tactic-btn').forEach(btn => {
+                    btn.addEventListener('click', () => this.toggleTactic(btn.dataset.tactic));
                 });
             },
 

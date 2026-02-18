@@ -602,6 +602,10 @@
             justify-content: space-between;
             padding: 12px;
             border-bottom: 1px solid #e0e0e0;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: white;
         }
 
         .archive-header h2 {
@@ -1224,7 +1228,7 @@
                 const targetId = firstUnplayed ? firstUnplayed.id : 1;
                 const targetEl = list.querySelector(`[data-level-id="${targetId}"]`);
                 if (targetEl) {
-                    targetEl.scrollIntoView({ block: 'start', behavior: 'instant' });
+                    list.scrollTop = targetEl.offsetTop;
                 }
             },
 

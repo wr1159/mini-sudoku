@@ -1207,11 +1207,25 @@
                 document.querySelector('.container').style.display = 'none';
                 document.getElementById('archiveView').style.display = 'flex';
                 this.renderArchiveList();
+                this.scrollToNextUnplayed();
             },
 
             closeArchive() {
                 document.getElementById('archiveView').style.display = 'none';
                 document.querySelector('.container').style.display = 'flex';
+            },
+
+            scrollToNextUnplayed() {
+                const list = document.getElementById('archiveLevelList');
+                const firstUnplayed = this.LEVELS.find(l => {
+                    const progress = this.archiveProgress[l.id];
+                    return !progress || !progress.bestTime;
+                });
+                const targetId = firstUnplayed ? firstUnplayed.id : 1;
+                const targetEl = list.querySelector(`[data-level-id="${targetId}"]`);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ block: 'start', behavior: 'instant' });
+                }
             },
 
             renderArchiveList() {
@@ -1226,7 +1240,7 @@
                     const completed = progress && progress.bestTime;
                     const timeStr = completed ? this.formatTime(progress.bestTime) : '--:--';
                     return `
-                        <div class="archive-level" onclick="app.playLevel(${level.id})">
+                        <div class="archive-level" data-level-id="${level.id}" onclick="app.playLevel(${level.id})">
                             <span class="level-name">Level ${level.id}</span>
                             <span class="level-time">${timeStr}</span>
                             <span class="level-status">${completed ? '✓' : ''}</span>

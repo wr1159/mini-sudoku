@@ -1225,10 +1225,10 @@
                     const progress = this.archiveProgress[l.id];
                     return !progress || !progress.bestTime;
                 });
-                const targetId = firstUnplayed ? firstUnplayed.id : 1;
+                const targetId = firstUnplayed ? firstUnplayed.id - 2 : 1;
                 const targetEl = list.querySelector(`[data-level-id="${targetId}"]`);
                 if (targetEl) {
-                    list.scrollTop += targetEl.getBoundingClientRect().top - list.getBoundingClientRect().top;
+                    targetEl.scrollIntoView({ block: 'start', behavior: 'instant' });
                 }
             },
 

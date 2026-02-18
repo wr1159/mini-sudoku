@@ -878,6 +878,7 @@
                 </div>
             </div>
             <div class="modal-actions">
+                <button class="modal-btn secondary" id="nextLevelBtn" onclick="app.playNextLevel()" style="display: none;">Next Level</button>
                 <button class="modal-btn primary" onclick="app.closeSolveStats()">Close</button>
             </div>
         </div>
@@ -1319,7 +1320,17 @@
 
             openSolveStats() {
                 this.renderSolveStatsChart();
+                const nextLevelBtn = document.getElementById('nextLevelBtn');
+                const hasNext = this.currentMode === 'archive' &&
+                    this.currentLevelId != null &&
+                    this.LEVELS.some(l => l.id === this.currentLevelId + 1);
+                nextLevelBtn.style.display = hasNext ? '' : 'none';
                 document.getElementById('solveStatsModal').classList.add('show');
+            },
+
+            playNextLevel() {
+                this.closeSolveStats();
+                this.playLevel(this.currentLevelId + 1);
             },
 
             closeSolveStats() {

@@ -342,6 +342,14 @@
             font-size: 18px;
         }
 
+        .number-btn.completed {
+            color: #ccc;
+            border-color: #eee;
+            background: #fafafa;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
         /* Message */
         .message {
             padding: 10px 16px;
@@ -2731,6 +2739,32 @@
                         gridEl.appendChild(cell);
                     }
                 }
+                if (this.solution && this.solution.length) {
+                    this.updateNumberPadState();
+                }
+            },
+
+            updateNumberPadState() {
+                const solutionCount = {};
+                const gridCount = {};
+                for (let num = 1; num <= 6; num++) {
+                    solutionCount[num] = 0;
+                    gridCount[num] = 0;
+                }
+                for (let r = 0; r < 6; r++) {
+                    for (let c = 0; c < 6; c++) {
+                        const s = this.solution[r][c];
+                        const g = this.grid[r][c];
+                        if (s) solutionCount[s]++;
+                        if (g) gridCount[g]++;
+                    }
+                }
+                document.querySelectorAll('.number-pad .number-btn:not(.action)').forEach(btn => {
+                    const num = parseInt(btn.textContent.trim());
+                    const done = gridCount[num] >= solutionCount[num];
+                    btn.classList.toggle('completed', done);
+                    btn.disabled = done;
+                });
             }
         };
 

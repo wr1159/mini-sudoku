@@ -1959,36 +1959,72 @@
 
             findXWing(grid) {
                 for (let num = 1; num <= 6; num++) {
+                    // Row-based: num appears exactly twice in two rows, in the same two columns
                     const rowPairs = [];
-                    
                     for (let row = 0; row < 6; row++) {
                         const cols = [];
                         for (let col = 0; col < 6; col++) {
-                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
-                                cols.push(col);
-                            }
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) cols.push(col);
                         }
-                        if (cols.length === 2) {
-                            rowPairs.push({ row, cols });
-                        }
+                        if (cols.length === 2) rowPairs.push({ row, cols });
                     }
-                    
                     for (let i = 0; i < rowPairs.length; i++) {
                         for (let j = i + 1; j < rowPairs.length; j++) {
-                            if (rowPairs[i].cols[0] === rowPairs[j].cols[0] && 
-                                rowPairs[i].cols[1] === rowPairs[j].cols[1]) {
-                                return {
-                                    type: 'X-Wing',
-                                    explanation: `X-Wing: ${num} appears exactly twice in rows ${rowPairs[i].row + 1} and ${rowPairs[j].row + 1}, both in columns ${rowPairs[i].cols[0] + 1} and ${rowPairs[i].cols[1] + 1}. Eliminates ${num} from other cells in those columns.`,
-                                    cells: [
-                                        [rowPairs[i].row, rowPairs[i].cols[0]],
-                                        [rowPairs[i].row, rowPairs[i].cols[1]],
-                                        [rowPairs[j].row, rowPairs[j].cols[0]],
-                                        [rowPairs[j].row, rowPairs[j].cols[1]]
-                                    ],
-                                    value: num
-                                };
+                            if (rowPairs[i].cols[0] !== rowPairs[j].cols[0] ||
+                                rowPairs[i].cols[1] !== rowPairs[j].cols[1]) continue;
+                            const r0 = rowPairs[i].row, r1 = rowPairs[j].row;
+                            const c0 = rowPairs[i].cols[0], c1 = rowPairs[i].cols[1];
+                            const eliminated = [];
+                            for (let r = 0; r < 6; r++) {
+                                if (r === r0 || r === r1) continue;
+                                if (grid[r][c0] === 0 && this.isValid(grid, r, c0, num)) eliminated.push([r, c0]);
+                                if (grid[r][c1] === 0 && this.isValid(grid, r, c1, num)) eliminated.push([r, c1]);
                             }
+                            if (eliminated.length === 0) continue;
+                            const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                            return {
+                                type: 'X-Wing',
+                                explanation: `X-Wing on ${num}: it can only go in columns ${c0+1} and ${c1+1} within rows ${r0+1} and ${r1+1}, locking ${num} to those columns. This eliminates ${num} from ${elimStr}.`,
+                                cells: [
+                                    [r0, c0], [r0, c1], [r1, c0], [r1, c1],
+                                    ...eliminated
+                                ],
+                                value: num
+                            };
+                        }
+                    }
+                    // Column-based: num appears exactly twice in two columns, in the same two rows
+                    const colPairs = [];
+                    for (let col = 0; col < 6; col++) {
+                        const rows = [];
+                        for (let row = 0; row < 6; row++) {
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) rows.push(row);
+                        }
+                        if (rows.length === 2) colPairs.push({ col, rows });
+                    }
+                    for (let i = 0; i < colPairs.length; i++) {
+                        for (let j = i + 1; j < colPairs.length; j++) {
+                            if (colPairs[i].rows[0] !== colPairs[j].rows[0] ||
+                                colPairs[i].rows[1] !== colPairs[j].rows[1]) continue;
+                            const r0 = colPairs[i].rows[0], r1 = colPairs[i].rows[1];
+                            const c0 = colPairs[i].col, c1 = colPairs[j].col;
+                            const eliminated = [];
+                            for (let c = 0; c < 6; c++) {
+                                if (c === c0 || c === c1) continue;
+                                if (grid[r0][c] === 0 && this.isValid(grid, r0, c, num)) eliminated.push([r0, c]);
+                                if (grid[r1][c] === 0 && this.isValid(grid, r1, c, num)) eliminated.push([r1, c]);
+                            }
+                            if (eliminated.length === 0) continue;
+                            const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                            return {
+                                type: 'X-Wing',
+                                explanation: `X-Wing on ${num}: it can only go in rows ${r0+1} and ${r1+1} within columns ${c0+1} and ${c1+1}, locking ${num} to those rows. This eliminates ${num} from ${elimStr}.`,
+                                cells: [
+                                    [r0, c0], [r0, c1], [r1, c0], [r1, c1],
+                                    ...eliminated
+                                ],
+                                value: num
+                            };
                         }
                     }
                 }
@@ -1996,50 +2032,77 @@
             },
 
             findYWing(grid) {
-                const allCandidates = {};
+                // Two cells "see" each other if they share a row, column, or 2×3 box
+                const sees = (r1, c1, r2, c2) => {
+                    if (r1 === r2 || c1 === c2) return true;
+                    return Math.floor(r1 / 2) === Math.floor(r2 / 2) &&
+                           Math.floor(c1 / 3) === Math.floor(c2 / 3);
+                };
+
+                const biValueCells = [];
                 for (let row = 0; row < 6; row++) {
                     for (let col = 0; col < 6; col++) {
                         if (grid[row][col] === 0) {
                             const cands = this.getCandidates(grid, row, col);
-                            if (cands.length === 2) {
-                                allCandidates[`${row}-${col}`] = { row, col, cands };
-                            }
+                            if (cands.length === 2) biValueCells.push({ row, col, cands });
                         }
                     }
                 }
-                
-                const biValueCells = Object.values(allCandidates);
-                
+
                 for (let i = 0; i < biValueCells.length; i++) {
                     const pivot = biValueCells[i];
                     for (let j = 0; j < biValueCells.length; j++) {
                         if (i === j) continue;
                         const wing1 = biValueCells[j];
-                        
-                        const sharedWithPivot = pivot.cands.filter(c => wing1.cands.includes(c));
-                        if (sharedWithPivot.length !== 1) continue;
-                        
+                        // Pivot must see wing1
+                        if (!sees(pivot.row, pivot.col, wing1.row, wing1.col)) continue;
+                        const shared1 = pivot.cands.filter(c => wing1.cands.includes(c));
+                        if (shared1.length !== 1) continue;
+
                         for (let k = 0; k < biValueCells.length; k++) {
                             if (k === i || k === j) continue;
                             const wing2 = biValueCells[k];
-                            
-                            const sharedWithPivot2 = pivot.cands.filter(c => wing2.cands.includes(c));
-                            if (sharedWithPivot2.length !== 1) continue;
-                            if (sharedWithPivot2[0] === sharedWithPivot[0]) continue;
-                            
+                            // Pivot must see wing2
+                            if (!sees(pivot.row, pivot.col, wing2.row, wing2.col)) continue;
+                            const shared2 = pivot.cands.filter(c => wing2.cands.includes(c));
+                            if (shared2.length !== 1) continue;
+                            // Wings must share different candidates with the pivot
+                            if (shared2[0] === shared1[0]) continue;
+
                             const sharedBetweenWings = wing1.cands.filter(c => wing2.cands.includes(c));
-                            if (sharedBetweenWings.length === 1) {
-                                return {
-                                    type: 'Y-Wing',
-                                    explanation: `Y-Wing: Pivot at (${pivot.row + 1}, ${pivot.col + 1}) [${pivot.cands.join(',')}] connects two wings. Eliminates ${sharedBetweenWings[0]} from cells seeing both wings.`,
-                                    cells: [
-                                        [pivot.row, pivot.col],
-                                        [wing1.row, wing1.col],
-                                        [wing2.row, wing2.col]
-                                    ],
-                                    value: sharedBetweenWings[0]
-                                };
+                            if (sharedBetweenWings.length !== 1) continue;
+                            const pincerVal = sharedBetweenWings[0];
+
+                            // Find cells that see BOTH wings and still have pincerVal as a candidate
+                            const eliminated = [];
+                            for (let r = 0; r < 6; r++) {
+                                for (let c = 0; c < 6; c++) {
+                                    if ((r === pivot.row && c === pivot.col) ||
+                                        (r === wing1.row && c === wing1.col) ||
+                                        (r === wing2.row && c === wing2.col)) continue;
+                                    if (grid[r][c] === 0 &&
+                                        sees(r, c, wing1.row, wing1.col) &&
+                                        sees(r, c, wing2.row, wing2.col) &&
+                                        this.isValid(grid, r, c, pincerVal)) {
+                                        eliminated.push([r, c]);
+                                    }
+                                }
                             }
+                            if (eliminated.length === 0) continue;
+
+                            const [A, B] = pivot.cands;
+                            const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                            return {
+                                type: 'Y-Wing',
+                                explanation: `Y-Wing: Pivot (${pivot.row+1},${pivot.col+1}) [${A},${B}] sees wing (${wing1.row+1},${wing1.col+1}) [${wing1.cands.join(',')}] and wing (${wing2.row+1},${wing2.col+1}) [${wing2.cands.join(',')}]. Whichever value the pivot takes, ${pincerVal} is forced into one of the wings — eliminating ${pincerVal} from ${elimStr}.`,
+                                cells: [
+                                    [pivot.row, pivot.col],
+                                    [wing1.row, wing1.col],
+                                    [wing2.row, wing2.col],
+                                    ...eliminated
+                                ],
+                                value: pincerVal
+                            };
                         }
                     }
                 }

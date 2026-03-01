@@ -2109,10 +2109,9 @@
                 return null;
             },
 
-            // BUG (Bivalue Universal Grave) - if all unsolved cells have 2 candidates
-            // except one cell with 3, that cell's value is the candidate appearing 3 times
+            // BUG+1 (Bivalue Universal Grave) - if all unsolved cells have 2 candidates
+            // except one cell with 3, that cell's extra candidate is the answer
             findBUG(grid) {
-                const cellCandidates = [];
                 let triValueCell = null;
 
                 for (let row = 0; row < 6; row++) {
@@ -2120,7 +2119,7 @@
                         if (grid[row][col] === 0) {
                             const cands = this.getCandidates(grid, row, col);
                             if (cands.length === 2) {
-                                cellCandidates.push({ row, col, cands });
+                                // fine
                             } else if (cands.length === 3) {
                                 if (triValueCell) return null; // More than one 3-candidate cell
                                 triValueCell = { row, col, cands };
@@ -2133,35 +2132,37 @@
 
                 if (!triValueCell) return null;
 
-                // Find which candidate appears 3 times in row/col/box
+                // The BUG candidate must appear an odd number of times in ALL three of
+                // its units (row, column, box). Using AND catches only genuine BUG+1 states.
                 for (const cand of triValueCell.cands) {
-                    // Count occurrences in row
                     let rowCount = 0;
                     for (let c = 0; c < 6; c++) {
-                        if (grid[triValueCell.row][c] === 0) {
-                            const cellCands = this.getCandidates(grid, triValueCell.row, c);
-                            if (cellCands.includes(cand)) rowCount++;
-                        }
+                        if (grid[triValueCell.row][c] === 0 &&
+                            this.getCandidates(grid, triValueCell.row, c).includes(cand)) rowCount++;
                     }
-
-                    // Count occurrences in column
                     let colCount = 0;
                     for (let r = 0; r < 6; r++) {
-                        if (grid[r][triValueCell.col] === 0) {
-                            const cellCands = this.getCandidates(grid, r, triValueCell.col);
-                            if (cellCands.includes(cand)) colCount++;
+                        if (grid[r][triValueCell.col] === 0 &&
+                            this.getCandidates(grid, r, triValueCell.col).includes(cand)) colCount++;
+                    }
+                    const boxRow = Math.floor(triValueCell.row / 2) * 2;
+                    const boxCol = Math.floor(triValueCell.col / 3) * 3;
+                    let boxCount = 0;
+                    for (let i = 0; i < 2; i++) {
+                        for (let j = 0; j < 3; j++) {
+                            const r = boxRow + i, c = boxCol + j;
+                            if (grid[r][c] === 0 &&
+                                this.getCandidates(grid, r, c).includes(cand)) boxCount++;
                         }
                     }
 
-                    // In a BUG, each candidate appears exactly twice in each unit
-                    // The solution is the candidate that appears 3 times (odd count)
-                    if (rowCount % 2 === 1 || colCount % 2 === 1) {
+                    if (rowCount % 2 === 1 && colCount % 2 === 1 && boxCount % 2 === 1) {
                         return {
-                            type: 'BUG (Bivalue Universal Grave)',
+                            type: 'BUG+1',
                             row: triValueCell.row,
                             col: triValueCell.col,
                             value: cand,
-                            explanation: `BUG detected! All cells have 2 candidates except (${triValueCell.row + 1}, ${triValueCell.col + 1}) with 3. The answer is ${cand} (appears odd number of times in its units).`,
+                            explanation: `BUG+1: Every unsolved cell has exactly 2 candidates except (${triValueCell.row+1},${triValueCell.col+1}) which has 3. If ${cand} weren't placed here, all remaining cells would have 2 candidates — creating a deadly pattern with two solutions. Therefore ${cand} must go in (${triValueCell.row+1},${triValueCell.col+1}).`,
                             cells: [[triValueCell.row, triValueCell.col]]
                         };
                     }
@@ -2172,44 +2173,84 @@
             // Swordfish - like X-Wing but with 3 rows/columns
             findSwordfish(grid) {
                 for (let num = 1; num <= 6; num++) {
-                    // Find rows where num appears in exactly 2-3 positions
+                    // Row-based: 3 rows where num is confined to the same 3 columns
                     const rowData = [];
                     for (let row = 0; row < 6; row++) {
                         const cols = [];
                         for (let col = 0; col < 6; col++) {
-                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
-                                cols.push(col);
-                            }
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) cols.push(col);
                         }
-                        if (cols.length >= 2 && cols.length <= 3) {
-                            rowData.push({ row, cols });
-                        }
+                        if (cols.length >= 2 && cols.length <= 3) rowData.push({ row, cols });
                     }
-
-                    // Need at least 3 rows for Swordfish
                     if (rowData.length >= 3) {
-                        // Try all combinations of 3 rows
                         for (let i = 0; i < rowData.length - 2; i++) {
                             for (let j = i + 1; j < rowData.length - 1; j++) {
                                 for (let k = j + 1; k < rowData.length; k++) {
-                                    const allCols = new Set([
-                                        ...rowData[i].cols,
-                                        ...rowData[j].cols,
-                                        ...rowData[k].cols
-                                    ]);
-                                    // Swordfish: 3 rows share exactly 3 columns
-                                    if (allCols.size === 3) {
-                                        return {
-                                            type: 'Swordfish',
-                                            explanation: `Swordfish: ${num} in rows ${rowData[i].row + 1}, ${rowData[j].row + 1}, ${rowData[k].row + 1} is confined to columns ${[...allCols].map(c => c + 1).join(', ')}. Eliminates ${num} from other cells in those columns.`,
-                                            cells: [
-                                                ...rowData[i].cols.map(c => [rowData[i].row, c]),
-                                                ...rowData[j].cols.map(c => [rowData[j].row, c]),
-                                                ...rowData[k].cols.map(c => [rowData[k].row, c])
-                                            ],
-                                            value: num
-                                        };
+                                    const allCols = new Set([...rowData[i].cols, ...rowData[j].cols, ...rowData[k].cols]);
+                                    if (allCols.size !== 3) continue;
+                                    const sfRows = [rowData[i].row, rowData[j].row, rowData[k].row];
+                                    const sfCols = [...allCols];
+                                    const eliminated = [];
+                                    for (let r = 0; r < 6; r++) {
+                                        if (sfRows.includes(r)) continue;
+                                        for (const c of sfCols) {
+                                            if (grid[r][c] === 0 && this.isValid(grid, r, c, num)) eliminated.push([r, c]);
+                                        }
                                     }
+                                    if (eliminated.length === 0) continue;
+                                    const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                                    return {
+                                        type: 'Swordfish',
+                                        explanation: `Swordfish on ${num}: in rows ${sfRows.map(r => r+1).join(', ')}, ${num} only appears in columns ${sfCols.map(c => c+1).join(', ')}. This locks ${num} to those columns — eliminating ${num} from ${elimStr}.`,
+                                        cells: [
+                                            ...rowData[i].cols.map(c => [rowData[i].row, c]),
+                                            ...rowData[j].cols.map(c => [rowData[j].row, c]),
+                                            ...rowData[k].cols.map(c => [rowData[k].row, c]),
+                                            ...eliminated
+                                        ],
+                                        value: num
+                                    };
+                                }
+                            }
+                        }
+                    }
+                    // Column-based: 3 columns where num is confined to the same 3 rows
+                    const colData = [];
+                    for (let col = 0; col < 6; col++) {
+                        const rows = [];
+                        for (let row = 0; row < 6; row++) {
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) rows.push(row);
+                        }
+                        if (rows.length >= 2 && rows.length <= 3) colData.push({ col, rows });
+                    }
+                    if (colData.length >= 3) {
+                        for (let i = 0; i < colData.length - 2; i++) {
+                            for (let j = i + 1; j < colData.length - 1; j++) {
+                                for (let k = j + 1; k < colData.length; k++) {
+                                    const allRows = new Set([...colData[i].rows, ...colData[j].rows, ...colData[k].rows]);
+                                    if (allRows.size !== 3) continue;
+                                    const sfCols = [colData[i].col, colData[j].col, colData[k].col];
+                                    const sfRows = [...allRows];
+                                    const eliminated = [];
+                                    for (let c = 0; c < 6; c++) {
+                                        if (sfCols.includes(c)) continue;
+                                        for (const r of sfRows) {
+                                            if (grid[r][c] === 0 && this.isValid(grid, r, c, num)) eliminated.push([r, c]);
+                                        }
+                                    }
+                                    if (eliminated.length === 0) continue;
+                                    const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                                    return {
+                                        type: 'Swordfish',
+                                        explanation: `Swordfish on ${num}: in columns ${sfCols.map(c => c+1).join(', ')}, ${num} only appears in rows ${sfRows.map(r => r+1).join(', ')}. This locks ${num} to those rows — eliminating ${num} from ${elimStr}.`,
+                                        cells: [
+                                            ...colData[i].rows.map(r => [r, colData[i].col]),
+                                            ...colData[j].rows.map(r => [r, colData[j].col]),
+                                            ...colData[k].rows.map(r => [r, colData[k].col]),
+                                            ...eliminated
+                                        ],
+                                        value: num
+                                    };
                                 }
                             }
                         }

@@ -1775,9 +1775,9 @@
                 }
 
                 for (let boxIdx = 0; boxIdx < 6; boxIdx++) {
-                    const boxRow = Math.floor(boxIdx / 3) * 2;
-                    const boxCol = (boxIdx % 3) * 3;
-                    
+                    const boxRow = Math.floor(boxIdx / 2) * 2;
+                    const boxCol = (boxIdx % 2) * 3;
+
                     for (let num = 1; num <= 6; num++) {
                         const positions = [];
                         for (let i = 0; i < 2; i++) {
@@ -1790,11 +1790,12 @@
                             }
                         }
                         if (positions.length === 1) {
+                            const [r, c] = positions[0];
                             return {
                                 type: 'Hidden Single (Box)',
-                                row: positions[0][0], col: positions[0][1],
+                                row: r, col: c,
                                 value: num,
-                                explanation: `In box (${Math.floor(boxIdx / 3) + 1}, ${(boxIdx % 3) + 1}), the number ${num} can only go in one position.`,
+                                explanation: `In box ${boxIdx + 1}, ${num} can only go in one cell: row ${r + 1}, column ${c + 1}.`,
                                 cells: positions
                             };
                         }
@@ -1851,35 +1852,88 @@
             },
 
             findNakedPair(grid) {
-                const allCandidates = {};
+                const biValueCells = [];
                 for (let row = 0; row < 6; row++) {
                     for (let col = 0; col < 6; col++) {
                         if (grid[row][col] === 0) {
-                            allCandidates[`${row}-${col}`] = this.getCandidates(grid, row, col);
+                            const cands = this.getCandidates(grid, row, col);
+                            if (cands.length === 2) biValueCells.push({ row, col, cands });
                         }
                     }
                 }
-                
-                // Check rows
-                for (let row = 0; row < 6; row++) {
-                    const cellsInRow = [];
-                    for (let col = 0; col < 6; col++) {
-                        const key = `${row}-${col}`;
-                        if (allCandidates[key] && allCandidates[key].length === 2) {
-                            cellsInRow.push({ col, candidates: allCandidates[key] });
-                        }
-                    }
-                    
-                    for (let i = 0; i < cellsInRow.length; i++) {
-                        for (let j = i + 1; j < cellsInRow.length; j++) {
-                            const c1 = cellsInRow[i].candidates;
-                            const c2 = cellsInRow[j].candidates;
-                            if (c1[0] === c2[0] && c1[1] === c2[1]) {
+
+                for (let i = 0; i < biValueCells.length; i++) {
+                    for (let j = i + 1; j < biValueCells.length; j++) {
+                        const a = biValueCells[i], b = biValueCells[j];
+                        if (a.cands[0] !== b.cands[0] || a.cands[1] !== b.cands[1]) continue;
+                        const [v1, v2] = a.cands;
+
+                        // Same row?
+                        if (a.row === b.row) {
+                            const eliminated = [];
+                            for (let c = 0; c < 6; c++) {
+                                if (c === a.col || c === b.col) continue;
+                                if (grid[a.row][c] === 0) {
+                                    const cands = this.getCandidates(grid, a.row, c);
+                                    if (cands.includes(v1) || cands.includes(v2)) eliminated.push([a.row, c]);
+                                }
+                            }
+                            if (eliminated.length > 0) {
+                                const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
                                 return {
                                     type: 'Naked Pair',
-                                    explanation: `Row ${row + 1} has a naked pair [${c1[0]}, ${c1[1]}] in columns ${cellsInRow[i].col + 1} and ${cellsInRow[j].col + 1}. These numbers can be eliminated from other cells in this row.`,
-                                    cells: [[row, cellsInRow[i].col], [row, cellsInRow[j].col]],
-                                    values: c1
+                                    explanation: `Naked Pair [${v1},${v2}] in row ${a.row+1} at columns ${a.col+1} and ${b.col+1}. These cells must hold ${v1} and ${v2} — eliminating both from ${elimStr}.`,
+                                    cells: [[a.row, a.col], [b.row, b.col], ...eliminated],
+                                    values: a.cands
+                                };
+                            }
+                        }
+
+                        // Same column?
+                        if (a.col === b.col) {
+                            const eliminated = [];
+                            for (let r = 0; r < 6; r++) {
+                                if (r === a.row || r === b.row) continue;
+                                if (grid[r][a.col] === 0) {
+                                    const cands = this.getCandidates(grid, r, a.col);
+                                    if (cands.includes(v1) || cands.includes(v2)) eliminated.push([r, a.col]);
+                                }
+                            }
+                            if (eliminated.length > 0) {
+                                const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                                return {
+                                    type: 'Naked Pair',
+                                    explanation: `Naked Pair [${v1},${v2}] in column ${a.col+1} at rows ${a.row+1} and ${b.row+1}. These cells must hold ${v1} and ${v2} — eliminating both from ${elimStr}.`,
+                                    cells: [[a.row, a.col], [b.row, b.col], ...eliminated],
+                                    values: a.cands
+                                };
+                            }
+                        }
+
+                        // Same box?
+                        const aBoxR = Math.floor(a.row / 2), aBoxC = Math.floor(a.col / 3);
+                        const bBoxR = Math.floor(b.row / 2), bBoxC = Math.floor(b.col / 3);
+                        if (aBoxR === bBoxR && aBoxC === bBoxC) {
+                            const boxRow = aBoxR * 2, boxCol = aBoxC * 3;
+                            const eliminated = [];
+                            for (let bi = 0; bi < 2; bi++) {
+                                for (let bj = 0; bj < 3; bj++) {
+                                    const r = boxRow + bi, c = boxCol + bj;
+                                    if ((r === a.row && c === a.col) || (r === b.row && c === b.col)) continue;
+                                    if (grid[r][c] === 0) {
+                                        const cands = this.getCandidates(grid, r, c);
+                                        if (cands.includes(v1) || cands.includes(v2)) eliminated.push([r, c]);
+                                    }
+                                }
+                            }
+                            if (eliminated.length > 0) {
+                                const boxNum = aBoxR * 2 + aBoxC + 1;
+                                const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                                return {
+                                    type: 'Naked Pair',
+                                    explanation: `Naked Pair [${v1},${v2}] in box ${boxNum} at (${a.row+1},${a.col+1}) and (${b.row+1},${b.col+1}). These cells must hold ${v1} and ${v2} — eliminating both from ${elimStr}.`,
+                                    cells: [[a.row, a.col], [b.row, b.col], ...eliminated],
+                                    values: a.cands
                                 };
                             }
                         }
@@ -1892,7 +1946,7 @@
                 for (let boxIdx = 0; boxIdx < 6; boxIdx++) {
                     const boxRow = Math.floor(boxIdx / 2) * 2;
                     const boxCol = (boxIdx % 2) * 3;
-                    
+
                     for (let num = 1; num <= 6; num++) {
                         const positions = [];
                         for (let i = 0; i < 2; i++) {
@@ -1904,26 +1958,44 @@
                                 }
                             }
                         }
-                        
+
                         if (positions.length >= 2 && positions.length <= 3) {
                             const sameRow = positions.every(([r]) => r === positions[0][0]);
                             if (sameRow) {
-                                return {
-                                    type: 'Pointing Pair',
-                                    explanation: `In box at (${boxRow + 1}, ${boxCol + 1}), number ${num} only appears in row ${positions[0][0] + 1}. Eliminates ${num} from other cells in that row.`,
-                                    cells: positions,
-                                    value: num
-                                };
+                                const targetRow = positions[0][0];
+                                const eliminated = [];
+                                for (let c = 0; c < 6; c++) {
+                                    if (c >= boxCol && c < boxCol + 3) continue;
+                                    if (grid[targetRow][c] === 0 && this.isValid(grid, targetRow, c, num)) eliminated.push([targetRow, c]);
+                                }
+                                if (eliminated.length > 0) {
+                                    const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                                    return {
+                                        type: 'Pointing Pair',
+                                        explanation: `In box ${boxIdx+1}, ${num} only appears in row ${targetRow+1}. So ${num} must land in this box's portion of that row — eliminating ${num} from ${elimStr}.`,
+                                        cells: [...positions, ...eliminated],
+                                        value: num
+                                    };
+                                }
                             }
-                            
+
                             const sameCol = positions.every(([, c]) => c === positions[0][1]);
                             if (sameCol) {
-                                return {
-                                    type: 'Pointing Pair',
-                                    explanation: `In box at (${boxRow + 1}, ${boxCol + 1}), number ${num} only appears in column ${positions[0][1] + 1}. Eliminates ${num} from other cells in that column.`,
-                                    cells: positions,
-                                    value: num
-                                };
+                                const targetCol = positions[0][1];
+                                const eliminated = [];
+                                for (let r = 0; r < 6; r++) {
+                                    if (r >= boxRow && r < boxRow + 2) continue;
+                                    if (grid[r][targetCol] === 0 && this.isValid(grid, r, targetCol, num)) eliminated.push([r, targetCol]);
+                                }
+                                if (eliminated.length > 0) {
+                                    const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                                    return {
+                                        type: 'Pointing Pair',
+                                        explanation: `In box ${boxIdx+1}, ${num} only appears in column ${targetCol+1}. So ${num} must land in this box's portion of that column — eliminating ${num} from ${elimStr}.`,
+                                        cells: [...positions, ...eliminated],
+                                        value: num
+                                    };
+                                }
                             }
                         }
                     }
@@ -1933,23 +2005,68 @@
 
             findBoxLineReduction(grid) {
                 for (let num = 1; num <= 6; num++) {
+                    // Row-based: all candidates in a row fall within one box → eliminate from rest of that box
                     for (let row = 0; row < 6; row++) {
                         const positions = [];
                         for (let col = 0; col < 6; col++) {
-                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
-                                positions.push([row, col]);
-                            }
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) positions.push([row, col]);
                         }
-                        
                         if (positions.length >= 2) {
                             const boxCols = positions.map(([, c]) => Math.floor(c / 3));
                             if (boxCols.every(bc => bc === boxCols[0])) {
-                                return {
-                                    type: 'Box/Line Reduction',
-                                    explanation: `In row ${row + 1}, number ${num} only appears in one box. Eliminates ${num} from other cells in that box.`,
-                                    cells: positions,
-                                    value: num
-                                };
+                                const boxCol = boxCols[0] * 3;
+                                const boxRow = Math.floor(row / 2) * 2;
+                                const eliminated = [];
+                                for (let i = 0; i < 2; i++) {
+                                    const r = boxRow + i;
+                                    if (r === row) continue;
+                                    for (let j = 0; j < 3; j++) {
+                                        const c = boxCol + j;
+                                        if (grid[r][c] === 0 && this.isValid(grid, r, c, num)) eliminated.push([r, c]);
+                                    }
+                                }
+                                if (eliminated.length > 0) {
+                                    const boxNum = Math.floor(row / 2) * 2 + boxCols[0] + 1;
+                                    const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                                    return {
+                                        type: 'Box/Line Reduction',
+                                        explanation: `In row ${row+1}, ${num} is confined to box ${boxNum}. So ${num} must be placed within that box's row — eliminating ${num} from the rest of box ${boxNum}: ${elimStr}.`,
+                                        cells: [...positions, ...eliminated],
+                                        value: num
+                                    };
+                                }
+                            }
+                        }
+                    }
+                    // Column-based: all candidates in a column fall within one box → eliminate from rest of that box
+                    for (let col = 0; col < 6; col++) {
+                        const positions = [];
+                        for (let row = 0; row < 6; row++) {
+                            if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) positions.push([row, col]);
+                        }
+                        if (positions.length >= 2) {
+                            const boxRows = positions.map(([r]) => Math.floor(r / 2));
+                            if (boxRows.every(br => br === boxRows[0])) {
+                                const boxRow = boxRows[0] * 2;
+                                const boxCol = Math.floor(col / 3) * 3;
+                                const eliminated = [];
+                                for (let i = 0; i < 2; i++) {
+                                    for (let j = 0; j < 3; j++) {
+                                        const r = boxRow + i, c = boxCol + j;
+                                        if (c === col) continue;
+                                        if (grid[r][c] === 0 && this.isValid(grid, r, c, num)) eliminated.push([r, c]);
+                                    }
+                                }
+                                if (eliminated.length > 0) {
+                                    const boxNum = boxRows[0] * 2 + Math.floor(col / 3) + 1;
+                                    const elimStr = eliminated.map(([r, c]) => `(${r+1},${c+1})`).join(', ');
+                                    return {
+                                        type: 'Box/Line Reduction',
+                                        explanation: `In column ${col+1}, ${num} is confined to box ${boxNum}. So ${num} must be placed within that box's column — eliminating ${num} from the rest of box ${boxNum}: ${elimStr}.`,
+                                        cells: [...positions, ...eliminated],
+                                        value: num
+                                    };
+                                }
                             }
                         }
                     }

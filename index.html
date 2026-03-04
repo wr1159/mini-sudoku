@@ -1712,6 +1712,14 @@
                 return { puzzle: grid, solution };
             },
 
+            shuffle(arr) {
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                return arr;
+            },
+
             getCandidates(grid, row, col) {
                 if (grid[row][col] !== 0) return [];
                 const candidates = [];
@@ -1724,19 +1732,20 @@
             },
 
             findNakedSingle(grid) {
-                for (let row = 0; row < 6; row++) {
-                    for (let col = 0; col < 6; col++) {
-                        if (grid[row][col] === 0) {
-                            const candidates = this.getCandidates(grid, row, col);
-                            if (candidates.length === 1) {
-                                return {
-                                    type: 'Naked Single',
-                                    row, col,
-                                    value: candidates[0],
-                                    explanation: `Cell (${row + 1}, ${col + 1}) can only be ${candidates[0]}. All other numbers are eliminated by existing numbers in its row, column, and box.`,
-                                    cells: [[row, col]]
-                                };
-                            }
+                const cells = [];
+                for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) cells.push([r, c]);
+                this.shuffle(cells);
+                for (const [row, col] of cells) {
+                    if (grid[row][col] === 0) {
+                        const candidates = this.getCandidates(grid, row, col);
+                        if (candidates.length === 1) {
+                            return {
+                                type: 'Naked Single',
+                                row, col,
+                                value: candidates[0],
+                                explanation: `Cell (${row + 1}, ${col + 1}) can only be ${candidates[0]}. All other numbers are eliminated by existing numbers in its row, column, and box.`,
+                                cells: [[row, col]]
+                            };
                         }
                     }
                 }
@@ -1744,8 +1753,10 @@
             },
 
             findHiddenSingle(grid) {
-                for (let row = 0; row < 6; row++) {
-                    for (let num = 1; num <= 6; num++) {
+                const nums = this.shuffle([1, 2, 3, 4, 5, 6]);
+                const rows = this.shuffle([0, 1, 2, 3, 4, 5]);
+                for (const row of rows) {
+                    for (const num of nums) {
                         const positions = [];
                         for (let col = 0; col < 6; col++) {
                             if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
@@ -1764,8 +1775,9 @@
                     }
                 }
 
-                for (let col = 0; col < 6; col++) {
-                    for (let num = 1; num <= 6; num++) {
+                const cols = this.shuffle([0, 1, 2, 3, 4, 5]);
+                for (const col of cols) {
+                    for (const num of nums) {
                         const positions = [];
                         for (let row = 0; row < 6; row++) {
                             if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) {
@@ -1784,11 +1796,12 @@
                     }
                 }
 
-                for (let boxIdx = 0; boxIdx < 6; boxIdx++) {
+                const boxes = this.shuffle([0, 1, 2, 3, 4, 5]);
+                for (const boxIdx of boxes) {
                     const boxRow = Math.floor(boxIdx / 2) * 2;
                     const boxCol = (boxIdx % 2) * 3;
 
-                    for (let num = 1; num <= 6; num++) {
+                    for (const num of nums) {
                         const positions = [];
                         for (let i = 0; i < 2; i++) {
                             for (let j = 0; j < 3; j++) {
@@ -1871,6 +1884,7 @@
                         }
                     }
                 }
+                this.shuffle(biValueCells);
 
                 for (let i = 0; i < biValueCells.length; i++) {
                     for (let j = i + 1; j < biValueCells.length; j++) {
@@ -1953,11 +1967,13 @@
             },
 
             findPointingPair(grid) {
-                for (let boxIdx = 0; boxIdx < 6; boxIdx++) {
+                const boxOrder = this.shuffle([0, 1, 2, 3, 4, 5]);
+                const numOrder = this.shuffle([1, 2, 3, 4, 5, 6]);
+                for (const boxIdx of boxOrder) {
                     const boxRow = Math.floor(boxIdx / 2) * 2;
                     const boxCol = (boxIdx % 2) * 3;
 
-                    for (let num = 1; num <= 6; num++) {
+                    for (const num of numOrder) {
                         const positions = [];
                         for (let i = 0; i < 2; i++) {
                             for (let j = 0; j < 3; j++) {
@@ -2014,9 +2030,9 @@
             },
 
             findBoxLineReduction(grid) {
-                for (let num = 1; num <= 6; num++) {
+                for (const num of this.shuffle([1, 2, 3, 4, 5, 6])) {
                     // Row-based: all candidates in a row fall within one box → eliminate from rest of that box
-                    for (let row = 0; row < 6; row++) {
+                    for (const row of this.shuffle([0, 1, 2, 3, 4, 5])) {
                         const positions = [];
                         for (let col = 0; col < 6; col++) {
                             if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) positions.push([row, col]);
@@ -2049,7 +2065,7 @@
                         }
                     }
                     // Column-based: all candidates in a column fall within one box → eliminate from rest of that box
-                    for (let col = 0; col < 6; col++) {
+                    for (const col of this.shuffle([0, 1, 2, 3, 4, 5])) {
                         const positions = [];
                         for (let row = 0; row < 6; row++) {
                             if (grid[row][col] === 0 && this.isValid(grid, row, col, num)) positions.push([row, col]);
@@ -2085,7 +2101,7 @@
             },
 
             findXWing(grid) {
-                for (let num = 1; num <= 6; num++) {
+                for (const num of this.shuffle([1, 2, 3, 4, 5, 6])) {
                     // Row-based: num appears exactly twice in two rows, in the same two columns
                     const rowPairs = [];
                     for (let row = 0; row < 6; row++) {
@@ -2175,6 +2191,7 @@
                         }
                     }
                 }
+                this.shuffle(biValueCells);
 
                 for (let i = 0; i < biValueCells.length; i++) {
                     const pivot = biValueCells[i];
@@ -2299,7 +2316,7 @@
 
             // Swordfish - like X-Wing but with 3 rows/columns
             findSwordfish(grid) {
-                for (let num = 1; num <= 6; num++) {
+                for (const num of this.shuffle([1, 2, 3, 4, 5, 6])) {
                     // Row-based: 3 rows where num is confined to the same 3 columns
                     const rowData = [];
                     for (let row = 0; row < 6; row++) {

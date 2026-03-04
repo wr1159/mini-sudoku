@@ -1331,6 +1331,16 @@
                 return Math.round(total / games.length);
             },
 
+            // Cubing-style average of N: drop the single best and worst, average the rest.
+            // Returns null if fewer than N times are available.
+            calcAo(times, n) {
+                if (times.length < n) return null;
+                const last = times.slice(-n);
+                const sorted = [...last].sort((a, b) => a - b);
+                const trimmed = sorted.slice(1, n - 1);
+                return Math.round(trimmed.reduce((a, b) => a + b, 0) / trimmed.length);
+            },
+
             formatTime(seconds) {
                 const mins = Math.floor(seconds / 60);
                 const secs = seconds % 60;
@@ -1387,6 +1397,11 @@
                 const accuracy = totalInputs > 0 ? Math.round((correctInputs / totalInputs) * 100) : 0;
                 const cspm = this.timer > 0 ? Math.round((correctInputs / this.timer) * 60 * 10) / 10 : 0;
 
+                const diffGames = this.stats.gamesByDifficulty[this.difficulty] || [];
+                const diffTimes = diffGames.map(g => g.time);
+                const ao5 = this.calcAo(diffTimes, 5);
+                const ao12 = this.calcAo(diffTimes, 12);
+
                 summary.innerHTML = `
                     <div class="stat">
                         <div class="stat-value">${this.formatTime(this.timer)}</div>
@@ -1399,6 +1414,14 @@
                     <div class="stat">
                         <div class="stat-value">${cspm}</div>
                         <div class="stat-label">CSPM</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${ao5 !== null ? this.formatTime(ao5) : '--:--'}</div>
+                        <div class="stat-label">Ao5</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${ao12 !== null ? this.formatTime(ao12) : '--:--'}</div>
+                        <div class="stat-label">Ao12</div>
                     </div>`;
 
                 if (attempts.length === 0) {
@@ -1571,6 +1594,9 @@
                     ? Math.round(gamesWithCspm.reduce((s, g) => s + g.cspm, 0) / gamesWithCspm.length * 10) / 10
                     : 0;
 
+                const ao5 = this.calcAo(times, 5);
+                const ao12 = this.calcAo(times, 12);
+
                 summary.innerHTML = `
                     <div class="stat">
                         <div class="stat-value">${this.formatTime(bestTime)}</div>
@@ -1591,6 +1617,14 @@
                     <div class="stat">
                         <div class="stat-value">${avgCspm}</div>
                         <div class="stat-label">Avg CSPM</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${ao5 !== null ? this.formatTime(ao5) : '--:--'}</div>
+                        <div class="stat-label">Ao5</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${ao12 !== null ? this.formatTime(ao12) : '--:--'}</div>
+                        <div class="stat-label">Ao12</div>
                     </div>
                 `;
             },

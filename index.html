@@ -30,11 +30,11 @@
 
         .container {
             background: white;
-            max-width: 420px;
+            max-width: 480px;
             width: 100%;
             min-height: 100vh;
             min-height: 100dvh;
-            padding: 12px;
+            padding: 8px 16px 0;
             display: flex;
             flex-direction: column;
         }
@@ -44,9 +44,9 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 0;
+            padding: 10px 0;
             border-bottom: 1px solid #e0e0e0;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
         }
 
         .top-bar h1 {
@@ -105,17 +105,19 @@
         .grid-wrapper {
             display: flex;
             justify-content: center;
-            align-items: center;
-            flex: 1;
-            min-height: 0;
+            align-items: flex-start;
+            margin-top: 4px;
         }
 
         .sudoku-grid {
-            display: inline-grid;
+            display: grid;
             grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(6, 1fr);
             gap: 0;
+            width: min(100%, 432px);
+            aspect-ratio: 1;
             border: 2px solid #444;
-            border-radius: 4px;
+            border-radius: 6px;
             overflow: hidden;
             background: #444;
             transition: filter 0.3s ease;
@@ -127,13 +129,13 @@
         }
 
         .cell {
-            width: 52px;
-            height: 52px;
+            width: 100%;
+            height: 100%;
             background: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 26px;
+            font-size: clamp(26px, 6.2vw, 34px);
             font-weight: 500;
             cursor: pointer;
             position: relative;
@@ -272,8 +274,9 @@
         .action-bar {
             display: flex;
             justify-content: center;
-            gap: 32px;
-            padding: 12px 0;
+            gap: 64px;
+            padding: 14px 0 12px;
+            margin-top: 10px;
             border-bottom: 1px solid #e0e0e0;
         }
 
@@ -281,13 +284,13 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
-            padding: 8px 16px;
+            gap: 6px;
+            padding: 0;
             border: none;
             background: transparent;
             cursor: pointer;
             color: #666;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 500;
         }
 
@@ -300,24 +303,24 @@
         }
 
         .action-btn .icon {
-            font-size: 20px;
+            font-size: 24px;
         }
 
         /* Number pad */
         .number-pad {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            padding: 12px 0;
-            padding-bottom: 48px;
+            gap: 10px;
+            padding: 14px 0 max(20px, env(safe-area-inset-bottom));
         }
 
         .number-btn {
-            padding: 16px;
-            font-size: 22px;
+            height: 72px;
+            padding: 0;
+            font-size: 39px;
             font-weight: 500;
             border: 1px solid #ddd;
-            border-radius: 8px;
+            border-radius: 12px;
             background: white;
             color: #000;
             cursor: pointer;
@@ -330,16 +333,19 @@
         }
 
         .number-btn.action {
-            font-size: 12px;
+            font-size: 15px;
             color: #666;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2px;
+            justify-content: center;
+            gap: 3px;
+            line-height: 1.15;
         }
 
         .number-btn.action .icon {
-            font-size: 18px;
+            font-size: 34px;
+            line-height: 1;
         }
 
         .number-btn.completed {
@@ -684,19 +690,82 @@
         }
 
         /* Responsive */
-        @media (max-width: 360px) {
-            .cell {
-                width: 46px;
-                height: 46px;
-                font-size: 22px;
+        @media (max-width: 380px) {
+            .container {
+                padding: 8px 12px 0;
+            }
+
+            .top-bar {
+                margin-bottom: 10px;
+            }
+
+            .sudoku-grid {
+                width: min(100%, 360px);
+            }
+
+            .action-bar {
+                gap: 50px;
+                padding: 12px 0 10px;
+                margin-top: 8px;
+            }
+
+            .action-btn {
+                font-size: 12px;
+            }
+
+            .action-btn .icon {
+                font-size: 21px;
+            }
+
+            .number-pad {
+                gap: 8px;
+                padding-top: 12px;
+            }
+
+            .number-btn {
+                height: 64px;
+                font-size: 34px;
+                border-radius: 10px;
+            }
+
+            .number-btn.action {
+                font-size: 14px;
+            }
+
+            .number-btn.action .icon {
+                font-size: 30px;
             }
         }
 
-        @media (min-width: 400px) {
-            .cell {
-                width: 56px;
-                height: 56px;
-                font-size: 28px;
+        @media (min-width: 430px) {
+            .container {
+                padding: 10px 18px 0;
+            }
+
+            .top-bar {
+                margin-bottom: 14px;
+            }
+
+            .sudoku-grid {
+                max-width: 438px;
+            }
+
+            .action-bar {
+                gap: 72px;
+            }
+
+            .number-pad {
+                gap: 12px;
+                padding-top: 16px;
+            }
+
+            .number-btn {
+                height: 78px;
+                font-size: 42px;
+            }
+
+            .number-btn.action .icon {
+                font-size: 36px;
             }
         }
     </style>

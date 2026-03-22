@@ -772,6 +772,15 @@
             }
         }
     </style>
+
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX');
+    </script>
 </head>
 <body>
     <div class="container">
@@ -1378,6 +1387,12 @@
 
                 // Update header to show level
                 document.querySelector('.top-bar h1').textContent = `Level ${id}`;
+
+                gtag('event', 'level_start', {
+                    game_mode: 'archive',
+                    level_id: id,
+                    difficulty: level.difficulty || 'unknown',
+                });
             },
 
             backToArchive() {
@@ -2554,12 +2569,21 @@
                 this.hideMessage();
                 this.updateTimerButton();
                 document.getElementById('newGameBtn').classList.remove('show');
+
+                gtag('event', 'game_start', {
+                    game_mode: 'random',
+                    difficulty: this.difficulty,
+                });
             },
 
             changeDifficulty(newDifficulty) {
                 this.difficulty = newDifficulty;
                 localStorage.setItem('sudokuDifficulty', newDifficulty);
                 this.updateSettingsUI();
+
+                gtag('event', 'difficulty_changed', {
+                    difficulty: newDifficulty,
+                });
             },
 
             toggleTactic(key) {
@@ -2950,6 +2974,14 @@
                             }
                             this.showMessage(message, 'success');
 
+                            gtag('event', 'puzzle_solved', {
+                                game_mode: 'archive',
+                                level_id: this.currentLevelId,
+                                difficulty: this.difficulty || 'unknown',
+                                time_seconds: this.timer,
+                                is_new_record: isNewRecord,
+                            });
+
                             // Update button text for archive mode
                             const btn = document.getElementById('newGameBtn');
                             btn.textContent = 'Back to Levels';
@@ -2960,6 +2992,13 @@
                             const correctInputs = this.solveAttempts.filter(a => a.correct).length;
                             const cspm = this.timer > 0 ? Math.round((correctInputs / this.timer) * 60 * 10) / 10 : 0;
                             this.trackGameComplete(this.difficulty, this.timer, cspm);
+
+                            gtag('event', 'puzzle_solved', {
+                                game_mode: 'random',
+                                difficulty: this.difficulty,
+                                time_seconds: this.timer,
+                                correct_inputs_per_min: cspm,
+                            });
 
                             const avg = this.getAverageTime(this.difficulty);
                             let message = `🎉 Solved in ${timeStr}!`;
